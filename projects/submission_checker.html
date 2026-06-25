@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CS4023 Submission Checker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f9; color: #222; }
+
+  header {
+    background: #003366; color: #fff;
+    padding: 18px 32px;
+    display: flex; align-items: center; gap: 16px;
+  }
+  header h1 { font-size: 1.3rem; font-weight: 600; }
+  header p  { font-size: 0.85rem; opacity: 0.8; margin-top: 2px; }
+
+  main { max-width: 780px; margin: 32px auto; padding: 0 16px; }
+
+  .card {
+    background: #fff; border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+    padding: 24px; margin-bottom: 24px;
+  }
+  .card h2 { font-size: 1rem; font-weight: 600; color: #003366; margin-bottom: 16px; }
+
+  .row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+
+  label { font-size: 0.85rem; font-weight: 600; color: #444; display: block; margin-bottom: 6px; }
+
+  select, input[type=file] {
+    border: 1.5px solid #ccd3de; border-radius: 6px;
+    padding: 8px 12px; font-size: 0.9rem;
+    background: #fff; color: #222;
+    width: 100%;
+  }
+  select { cursor: pointer; }
+
+  .field { flex: 1; min-width: 180px; }
+
+  button#check-btn {
+    background: #003366; color: #fff;
+    border: none; border-radius: 6px;
+    padding: 10px 28px; font-size: 0.95rem;
+    cursor: pointer; font-weight: 600;
+    margin-top: 8px;
+  }
+  button#check-btn:hover { background: #00509e; }
+  button#check-btn:disabled { background: #aaa; cursor: default; }
+
+  #results { display: none; }
+
+  .summary-bar {
+    border-radius: 8px; padding: 14px 20px;
+    display: flex; align-items: center; gap: 12px;
+    font-weight: 600; font-size: 1rem;
+    margin-bottom: 20px;
+  }
+  .summary-bar.pass { background: #d4edda; color: #155724; border: 1px solid #b8dfc1; }
+  .summary-bar.fail { background: #f8d7da; color: #721c24; border: 1px solid #f1b8bc; }
+  .summary-bar.warn { background: #fff3cd; color: #856404; border: 1px solid #ffe8a1; }
+
+  .check-list { list-style: none; }
+  .check-list li {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid #eee;
+    font-size: 0.9rem;
+  }
+  .check-list li:last-child { border-bottom: none; }
+
+  .icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+  .pass-icon { color: #28a745; }
+  .fail-icon { color: #dc3545; }
+  .warn-icon { color: #e6a817; }
+  .info-icon { color: #6c757d; }
+
+  .check-text strong { display: block; font-weight: 600; }
+  .check-text span   { color: #555; font-size: 0.82rem; }
+
+  .file-tree {
+    background: #f8f9fa; border: 1px solid #dee2e6;
+    border-radius: 6px; padding: 12px 16px;
+    font-family: 'Consolas', monospace; font-size: 0.8rem;
+    max-height: 220px; overflow-y: auto;
+    margin-top: 12px; line-height: 1.7;
+    color: #333;
+  }
+  .file-tree .dir  { color: #003366; font-weight: 600; }
+  .file-tree .file { padding-left: 18px; }
+  .file-tree .bad  { color: #dc3545; }
+  .file-tree .warn { color: #e6a817; }
+
+  #error-msg {
+    background: #f8d7da; color: #721c24;
+    border: 1px solid #f1b8bc; border-radius: 6px;
+    padding: 12px 16px; font-size: 0.9rem;
+    display: none; margin-top: 12px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>CS4023 Operating Systems — Submission Structure Checker</h1>
+    <p>Validate your zip file before uploading to Brightspace. Fix all ❌ issues before submitting.</p>
+  </div>
+</header>
+
+<main>
+  <div class="card">
+    <h2>Step 1 — Select your project and zip file</h2>
+    <div class="row">
+      <div class="field">
+        <label for="project-select">Project</label>
+        <select id="project-select">
+          <option value="">— choose project —</option>
+          <option value="1">Project 1 – Mini-Shell</option>
+          <option value="2">Project 2 – Parallel Matrix Multiply</option>
+          <option value="3">Project 3 – Readers-Writers</option>
+          <option value="4">Project 4 – CPU Scheduling Simulator</option>
+          <option value="5">Project 5 – Page Replacement Simulator</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="zip-input">Your zip file</label>
+        <input type="file" id="zip-input" accept=".zip">
+      </div>
+    </div>
+    <button id="check-btn" disabled>Check Submission</button>
+    <div id="error-msg"></div>
+  </div>
+
+  <div id="results">
+    <div class="card">
+      <h2>Results</h2>
+      <div id="summary-bar" class="summary-bar"></div>
+      <ul id="check-list" class="check-list"></ul>
+    </div>
+    <div class="card">
+      <h2>Contents of your zip</h2>
+      <div id="file-tree" class="file-tree"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ─── Minimal ZIP central-directory parser (no external libraries) ───────────
+function listZipEntries(buffer) {
+  const view  = new DataView(buffer);
+  const bytes = new Uint8Array(buffer);
+  const dec   = new TextDecoder('utf-8');
+
+  // Find End of Central Directory (EOCD) signature 0x06054b50
+  let eocd = -1;
+  for (let i = buffer.byteLength - 22; i >= Math.max(0, buffer.byteLength - 65558); i--) {
+    if (view.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd === -1) throw new Error('Not a valid ZIP file (EOCD signature not found).');
+
+  const cdCount  = view.getUint16(eocd + 8,  true);
+  let   cdOffset = view.getUint32(eocd + 16, true);
+
+  // Handle ZIP64
+  if (cdOffset === 0xFFFFFFFF) throw new Error('ZIP64 format not supported. Please use a standard zip tool.');
+
+  const entries = [];
+  let pos = cdOffset;
+  for (let i = 0; i < cdCount; i++) {
+    if (view.getUint32(pos, true) !== 0x02014b50) break;
+    const fnLen  = view.getUint16(pos + 28, true);
+    const exLen  = view.getUint16(pos + 30, true);
+    const cmLen  = view.getUint16(pos + 32, true);
+    const name   = dec.decode(bytes.slice(pos + 46, pos + 46 + fnLen));
+    entries.push(name);
+    pos += 46 + fnLen + exLen + cmLen;
+  }
+  return entries;
+}
+
+// ─── Per-project required files ─────────────────────────────────────────────
+const PROJECT_SPECS = {
+  '1': { name: 'Mini-Shell',              binary: 'cs4023-shell', extraRequired: [],                                           extraOptional: [] },
+  '2': { name: 'Parallel Matrix Multiply', binary: 'matmul',      extraRequired: [],                                           extraOptional: [] },
+  '3': { name: 'Readers-Writers',          binary: 'rw',           extraRequired: [],                                           extraOptional: [] },
+  '4': { name: 'CPU Scheduling Simulator', binary: 'scheduler',    extraRequired: ['sample_processes.txt'],                     extraOptional: [] },
+  '5': { name: 'Page Replacement',         binary: 'pager',        extraRequired: ['sample_refs.txt', 'belady_demo.txt'],       extraOptional: [] },
+};
+
+const BANNED_EXTENSIONS = ['.o', '.a', '.so', '.exe', '.out'];
+const BANNED_NAMES      = ['.DS_Store', 'Thumbs.db'];
+const BANNED_DIRS       = ['__MACOSX', '.git', 'node_modules'];
+
+// ─── Main validation ─────────────────────────────────────────────────────────
+function validate(filename, entries, projectId) {
+  const spec    = PROJECT_SPECS[projectId];
+  const results = [];   // { status: 'pass'|'fail'|'warn'|'info', title, detail }
+
+  // ── 1. Zip filename format ──────────────────────────────────────────────
+  const zipNameNoExt = filename.replace(/\.zip$/i, '');
+  const namePattern  = /^\d{8}_cs4023_p[1-5]$/;
+  const nameOk       = namePattern.test(zipNameNoExt);
+  const correctP     = zipNameNoExt.endsWith(`_cs4023_p${projectId}`);
+
+  if (!nameOk) {
+    results.push({ status: 'fail', title: 'Zip filename format', detail: `Expected format: <8-digit student ID>_cs4023_p${projectId}.zip  (e.g. 12345678_cs4023_p${projectId}.zip). Got: "${filename}"` });
+  } else if (!correctP) {
+    results.push({ status: 'fail', title: 'Zip filename — wrong project number', detail: `Filename suggests a different project. Expected _cs4023_p${projectId}.zip.` });
+  } else {
+    results.push({ status: 'pass', title: 'Zip filename format', detail: `"${filename}" — correct format.` });
+  }
+
+  // ── 2. Single top-level folder ──────────────────────────────────────────
+  const topDirs = [...new Set(
+    entries.map(e => e.split('/')[0]).filter(Boolean)
+  )];
+  const topFiles = entries.filter(e => !e.includes('/') && !e.endsWith('/'));
+
+  if (topFiles.length > 0) {
+    results.push({ status: 'fail', title: 'Loose files at zip root', detail: `Found files outside a folder: ${topFiles.join(', ')}. Everything must be inside one folder.` });
+  }
+
+  if (topDirs.length === 0) {
+    results.push({ status: 'fail', title: 'No top-level folder found', detail: 'The zip appears to be empty.' });
+    return results;
+  }
+  if (topDirs.length > 1) {
+    const realDirs = topDirs.filter(d => !BANNED_DIRS.includes(d));
+    if (realDirs.length > 1) {
+      results.push({ status: 'fail', title: 'Multiple top-level folders', detail: `Found: ${realDirs.join(', ')}. There must be exactly one top-level folder.` });
+    }
+  }
+
+  const rootDir = topDirs.find(d => !BANNED_DIRS.includes(d)) || topDirs[0];
+
+  // ── 3. Top-level folder name matches zip name ───────────────────────────
+  if (rootDir !== zipNameNoExt) {
+    results.push({ status: 'fail', title: 'Folder name must match zip name', detail: `Zip name (without .zip): "${zipNameNoExt}". Top-level folder: "${rootDir}". They must be identical.` });
+  } else {
+    results.push({ status: 'pass', title: 'Folder name matches zip name', detail: `Both are "${rootDir}".` });
+  }
+
+  // ── Helper: file exists inside rootDir (case-sensitive) ─────────────────
+  const inRoot = name => entries.includes(`${rootDir}/${name}`) || entries.includes(`${rootDir}/${name}/`);
+  const filesInRoot = entries
+    .filter(e => e.startsWith(`${rootDir}/`) && e !== `${rootDir}/`)
+    .map(e => e.slice(rootDir.length + 1))
+    .filter(e => !e.includes('/'));   // direct children only
+
+  // ── 4. Makefile ─────────────────────────────────────────────────────────
+  if (inRoot('Makefile')) {
+    results.push({ status: 'pass', title: 'Makefile present', detail: 'Found Makefile (correct capitalisation).' });
+  } else if (filesInRoot.some(f => f.toLowerCase() === 'makefile')) {
+    results.push({ status: 'fail', title: 'Makefile — wrong capitalisation', detail: 'Found a makefile but capitalisation is wrong. Linux is case-sensitive: must be exactly "Makefile".' });
+  } else {
+    results.push({ status: 'fail', title: 'Makefile missing', detail: 'No Makefile found in the top-level folder. The grading script will fail without it.' });
+  }
+
+  // ── 5. report.md ────────────────────────────────────────────────────────
+  if (inRoot('report.md')) {
+    results.push({ status: 'pass', title: 'report.md present', detail: '' });
+  } else {
+    results.push({ status: 'fail', title: 'report.md missing', detail: 'Required: report.md (lowercase, markdown format).' });
+  }
+
+  // ── 6. ai_log ───────────────────────────────────────────────────────────
+  const hasAiLogMd  = inRoot('ai_log.md');
+  const hasAiLogTxt = inRoot('ai_log.txt');
+  if (hasAiLogMd || hasAiLogTxt) {
+    const which = hasAiLogMd ? 'ai_log.md' : 'ai_log.txt';
+    results.push({ status: 'pass', title: 'AI log present', detail: `Found ${which}.` });
+  } else {
+    results.push({ status: 'fail', title: 'AI log missing', detail: 'Required: ai_log.md (or ai_log.txt). Without it, Criteria 2 and 3 are capped at 40%.' });
+  }
+
+  // ── 7. At least one .c file ──────────────────────────────────────────────
+  const cFiles = filesInRoot.filter(f => f.endsWith('.c'));
+  if (cFiles.length > 0) {
+    results.push({ status: 'pass', title: `C source file(s) present`, detail: cFiles.join(', ') });
+  } else {
+    results.push({ status: 'fail', title: 'No .c source files found', detail: 'No C source files found in the top-level folder.' });
+  }
+
+  // ── 8. Project-specific required files ──────────────────────────────────
+  for (const req of spec.extraRequired) {
+    if (inRoot(req)) {
+      results.push({ status: 'pass', title: `${req} present`, detail: '' });
+    } else {
+      results.push({ status: 'fail', title: `${req} missing`, detail: `Project ${projectId} requires "${req}" in the submission folder.` });
+    }
+  }
+
+  // ── 9. Banned files ──────────────────────────────────────────────────────
+  const bannedFound = filesInRoot.filter(f => {
+    const ext  = f.includes('.') ? '.' + f.split('.').pop().toLowerCase() : '';
+    const base = f.split('/').pop();
+    return BANNED_EXTENSIONS.includes(ext) || BANNED_NAMES.includes(base);
+  });
+  if (bannedFound.length > 0) {
+    results.push({ status: 'warn', title: 'Compiled/build artefacts in zip', detail: `Remove before submitting: ${bannedFound.join(', ')}. Run "make clean" first.` });
+  }
+
+  // ── 10. __MACOSX / .DS_Store (Mac users) ────────────────────────────────
+  if (entries.some(e => e.startsWith('__MACOSX'))) {
+    results.push({ status: 'warn', title: 'Mac metadata folder present (__MACOSX)', detail: 'This folder is harmless but messy. On macOS, zip with: zip -r submission.zip folder/ -x "*.DS_Store" -x "__MACOSX"' });
+  }
+
+  // ── 11. Deeply nested files (common mistake) ────────────────────────────
+  const deepFiles = entries.filter(e => {
+    const parts = e.split('/').filter(Boolean);
+    return parts.length > 2 && !BANNED_DIRS.some(d => e.startsWith(d));
+  });
+  if (deepFiles.length > 0) {
+    results.push({ status: 'warn', title: 'Nested sub-folders detected', detail: `Found files more than one level deep. Source files should be directly inside the top-level folder (not in sub-folders).  Example of a problem: ${deepFiles.slice(0,2).join(', ')}` });
+  }
+
+  return results;
+}
+
+// ─── Render ──────────────────────────────────────────────────────────────────
+function icon(status) {
+  return {
+    pass: '<span class="icon pass-icon">✅</span>',
+    fail: '<span class="icon fail-icon">❌</span>',
+    warn: '<span class="icon warn-icon">⚠️</span>',
+    info: '<span class="icon info-icon">ℹ️</span>',
+  }[status] || '';
+}
+
+function renderResults(filename, entries, results, projectId) {
+  document.getElementById('results').style.display = 'block';
+
+  const failures  = results.filter(r => r.status === 'fail').length;
+  const warnings  = results.filter(r => r.status === 'warn').length;
+
+  const bar = document.getElementById('summary-bar');
+  if (failures > 0) {
+    bar.className = 'summary-bar fail';
+    bar.innerHTML = `❌ &nbsp; ${failures} issue${failures > 1 ? 's' : ''} must be fixed before submitting` +
+      (warnings > 0 ? ` &nbsp;·&nbsp; ${warnings} warning${warnings > 1 ? 's' : ''}` : '');
+  } else if (warnings > 0) {
+    bar.className = 'summary-bar warn';
+    bar.innerHTML = `⚠️ &nbsp; Structure looks correct but ${warnings} warning${warnings > 1 ? 's' : ''} — review before submitting`;
+  } else {
+    bar.className = 'summary-bar pass';
+    bar.innerHTML = `✅ &nbsp; Structure is correct — safe to submit`;
+  }
+
+  const list = document.getElementById('check-list');
+  list.innerHTML = results.map(r =>
+    `<li>
+      ${icon(r.status)}
+      <div class="check-text">
+        <strong>${r.title}</strong>
+        ${r.detail ? `<span>${r.detail}</span>` : ''}
+      </div>
+    </li>`
+  ).join('');
+
+  // File tree
+  const spec    = PROJECT_SPECS[projectId];
+  const rootDir = [...new Set(entries.map(e => e.split('/')[0]).filter(Boolean))]
+    .find(d => !['__MACOSX', '.git'].includes(d)) || '(root)';
+
+  const allRequired = ['Makefile', 'report.md', 'ai_log.md', ...spec.extraRequired];
+
+  const treeLines = [`<span class="dir">${rootDir}/</span>`];
+  entries
+    .filter(e => e.startsWith(rootDir + '/') && e !== rootDir + '/')
+    .sort()
+    .forEach(e => {
+      const rel  = e.slice(rootDir.length + 1);
+      const base = rel.split('/').pop() || rel;
+      const ext  = base.includes('.') ? '.' + base.split('.').pop().toLowerCase() : '';
+      let cls = 'file';
+      if (BANNED_EXTENSIONS.includes(ext) || BANNED_NAMES.includes(base)) cls = 'file bad';
+      else if (base.startsWith('__MACOSX') || base === '.DS_Store') cls = 'file warn';
+      treeLines.push(`<span class="${cls}">${rel}</span>`);
+    });
+
+  document.getElementById('file-tree').innerHTML = treeLines.join('\n');
+}
+
+// ─── Wiring ───────────────────────────────────────────────────────────────────
+const projectSelect = document.getElementById('project-select');
+const zipInput      = document.getElementById('zip-input');
+const checkBtn      = document.getElementById('check-btn');
+const errorMsg      = document.getElementById('error-msg');
+
+function updateBtn() {
+  checkBtn.disabled = !(projectSelect.value && zipInput.files.length > 0);
+}
+projectSelect.addEventListener('change', updateBtn);
+zipInput.addEventListener('change', updateBtn);
+
+checkBtn.addEventListener('click', () => {
+  errorMsg.style.display = 'none';
+  document.getElementById('results').style.display = 'none';
+
+  const file      = zipInput.files[0];
+  const projectId = projectSelect.value;
+  if (!file || !projectId) return;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const entries = listZipEntries(e.target.result);
+      const results = validate(file.name, entries, projectId);
+      renderResults(file.name, entries, results, projectId);
+    } catch (err) {
+      errorMsg.textContent = '⚠️ Could not read zip file: ' + err.message;
+      errorMsg.style.display = 'block';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+</script>
+</body>
+</html>
