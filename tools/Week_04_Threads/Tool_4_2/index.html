@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CS4023 – Tool 4.2: pthread API Matcher</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f7fa; color: #1a1a2e; }
+  header { background: #1a1a2e; color: #fff; padding: 1rem 1.5rem; }
+  header h1 { font-size: 1.1rem; font-weight: 700; }
+  header p  { font-size: 0.85rem; color: #a0aec0; margin-top: 0.2rem; }
+
+  /* ── Tabs ─────────────────────────────────────────────── */
+  .tabs { display: flex; background: #2d3748; }
+  .tab-btn { flex: 1; padding: 0.75rem; border: none; background: none; color: #a0aec0; font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: background 0.15s, color 0.15s; }
+  .tab-btn.active { background: #f97316; color: #fff; }
+  .tab-btn:hover:not(.active) { background: #4a5568; color: #fff; }
+  .tab-panel { display: none; padding: 1.2rem 1rem; max-width: 960px; margin: 0 auto; }
+  .tab-panel.active { display: block; }
+
+  /* ── Common ───────────────────────────────────────────── */
+  .btn { border: none; border-radius: 7px; padding: 0.5rem 1.2rem; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+  .btn-primary { background: #2b6cb0; color: #fff; }
+  .btn-primary:hover { background: #2c5282; }
+  .btn-success { background: #276749; color: #fff; }
+  .btn-success:hover { background: #22543d; }
+  .btn-muted   { background: #718096; color: #fff; }
+  .btn-muted:hover { background: #4a5568; }
+  .btn-warning { background: #c05621; color: #fff; }
+  .btn-warning:hover { background: #9c4221; }
+  h2 { font-size: 0.95rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #2d3748; margin-bottom: 1rem; }
+  .score-badge { display: inline-block; font-size: 0.92rem; font-weight: 700; padding: 4px 12px; border-radius: 12px; margin-left: 0.8rem; background: #e2e8f0; color: #2d3748; }
+
+  /* ── TAB 1: API Matcher ───────────────────────────────── */
+  .matcher-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+  @media(max-width:600px){ .matcher-grid { grid-template-columns: 1fr; } }
+  .matcher-col h3 { font-size: 0.82rem; font-weight: 700; color: #4a5568; text-transform: uppercase; margin-bottom: 0.6rem; }
+  .fn-btn, .desc-btn {
+    display: block; width: 100%; text-align: left; padding: 0.45rem 0.75rem;
+    margin-bottom: 0.4rem; border: 2px solid #cbd5e0; border-radius: 6px;
+    background: #fff; font-size: 0.82rem; cursor: pointer; transition: border-color 0.12s, background 0.12s;
+  }
+  .fn-btn { font-family: 'Courier New', monospace; font-weight: 700; color: #1a365d; }
+  .fn-btn.selected { border-color: #f97316; background: #fff7ed; }
+  .fn-btn.matched  { border-color: #276749; background: #c6f6d5; pointer-events: none; color: #276749; }
+  .fn-btn.wrong-flash { border-color: #e53e3e; background: #fff5f5; animation: flash 0.4s; }
+  .desc-btn.selected { border-color: #f97316; background: #fff7ed; }
+  .desc-btn.matched  { border-color: #276749; background: #c6f6d5; pointer-events: none; color: #276749; }
+  .desc-btn.wrong-flash { border-color: #e53e3e; background: #fff5f5; animation: flash 0.4s; }
+  @keyframes flash { 0%,100%{background:#fff5f5} 50%{background:#fed7d7} }
+
+  /* ── TAB 2: Fix the Bug ───────────────────────────────── */
+  .bug-card { background: #fff; border: 2px solid #e2e8f0; border-radius: 10px; padding: 1rem; margin-bottom: 1.2rem; }
+  .bug-card h3 { font-size: 0.88rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .code-block { background: #1e1e1e; color: #d4d4d4; border-radius: 8px; padding: 0.9rem; font-family: 'Courier New', monospace; font-size: 0.8rem; line-height: 1.6; overflow-x: auto; margin-bottom: 0.8rem; white-space: pre; }
+  .bug-highlight { background: #ff000030; border-bottom: 2px solid #f56565; color: #fca5a5; }
+  .bug-question { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem; color: #2d3748; }
+  .bug-select { width: 100%; padding: 0.45rem 0.6rem; border: 2px solid #cbd5e0; border-radius: 6px; font-size: 0.84rem; margin-bottom: 0.6rem; background: #fff; }
+  .feedback-box { padding: 0.6rem 0.9rem; border-radius: 7px; font-size: 0.85rem; display: none; }
+  .feedback-box.show { display: block; }
+  .feedback-correct { background: #c6f6d5; color: #22543d; border-left: 4px solid #38a169; }
+  .feedback-wrong   { background: #fed7d7; color: #742a2a; border-left: 4px solid #e53e3e; }
+
+  /* ── TAB 3: Complete the Code ─────────────────────────── */
+  .code-fill { background: #1e1e1e; color: #d4d4d4; border-radius: 8px; padding: 1rem; font-family: 'Courier New', monospace; font-size: 0.8rem; line-height: 1.9; overflow-x: auto; margin-bottom: 1rem; }
+  .blank-select { background: #2a2a3e; color: #79c0ff; border: 2px solid #4a5568; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 0.78rem; padding: 1px 4px; cursor: pointer; }
+  .blank-select.correct-sel { border-color: #68d391; color: #68d391; }
+  .blank-select.wrong-sel   { border-color: #fc8181; color: #fc8181; }
+  .terminal-output { background: #0d1117; color: #7ee787; border-radius: 8px; padding: 0.9rem; font-family: 'Courier New', monospace; font-size: 0.82rem; line-height: 1.6; display: none; margin-top: 0.8rem; white-space: pre; }
+  .terminal-output.show { display: block; }
+  .error-output { color: #f85149; }
+  .tab3-controls { display: flex; gap: 0.7rem; flex-wrap: wrap; margin-bottom: 0.8rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>CS4023 – Tool 4.2: pthread API Matcher</h1>
+  <p>Three activities: match API functions → spot bugs → complete a pthreads program</p>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab(0)">1 – API Matcher</button>
+  <button class="tab-btn" onclick="switchTab(1)">2 – Fix the Bug</button>
+  <button class="tab-btn" onclick="switchTab(2)">3 – Complete the Code</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ TAB 1 -->
+<div class="tab-panel active" id="tab0">
+  <h2>API Matcher — click one function, then one description</h2>
+  <div class="matcher-grid">
+    <div class="matcher-col">
+      <h3>pthread Functions</h3>
+      <div id="fnList"></div>
+    </div>
+    <div class="matcher-col">
+      <h3>Purpose / Description</h3>
+      <div id="descList"></div>
+    </div>
+  </div>
+  <div style="display:flex;gap:.7rem;flex-wrap:wrap;align-items:center;margin-bottom:1rem">
+    <button class="btn btn-primary" onclick="checkAll()">Check All</button>
+    <button class="btn btn-muted" onclick="resetMatcher()">Reset</button>
+    <button class="btn btn-warning" onclick="showAllAnswers()">Show All (caps score at 5/10)</button>
+    <span class="score-badge" id="matchScore"></span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ TAB 2 -->
+<div class="tab-panel" id="tab1">
+  <h2>Fix the Bug — identify the pthread mistake in each snippet</h2>
+
+  <!-- Bug 1 -->
+  <div class="bug-card">
+    <h3>Bug 1 — Thread that vanishes</h3>
+    <div class="code-block"><span style="color:#6a9955">/* print_hello.c — something is wrong… */</span>
+#include &lt;stdio.h&gt;
+#include &lt;pthread.h&gt;
+
+void *hello(void *arg) {
+    printf("Hello from thread!\n");
+    return NULL;
+}
+
+int main(void) {
+    pthread_t tid;
+    pthread_create(&amp;tid, NULL, hello, NULL);
+    <span class="bug-highlight">/* BUG is here — ??? */</span>
+    return 0;
+}</div>
+    <div class="bug-question">What is the bug?</div>
+    <select class="bug-select" onchange="checkBug(0, this.value, this)">
+      <option value="">— choose an answer —</option>
+      <option value="a">pthread_create() was called with wrong argument order</option>
+      <option value="b">main() returns before the thread finishes (missing pthread_join)</option>
+      <option value="c">hello() must return an int, not void*</option>
+      <option value="d">printf() is not thread-safe and must be replaced</option>
+    </select>
+    <div class="feedback-box" id="fb0"></div>
+  </div>
+
+  <!-- Bug 2 -->
+  <div class="bug-card">
+    <h3>Bug 2 — All threads print the same number</h3>
+    <div class="code-block"><span style="color:#6a9955">/* thread_ids.c — each thread should print its own ID */</span>
+#include &lt;stdio.h&gt;
+#include &lt;pthread.h&gt;
+#define N 4
+
+void *print_id(void *arg) {
+    int id = *((int *)arg);
+    printf("Thread %d\n", id);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t tids[N];
+    for (int i = 0; i &lt; N; i++) {
+        <span class="bug-highlight">pthread_create(&amp;tids[i], NULL, print_id, &amp;i);  /* ??? */</span>
+    }
+    for (int i = 0; i &lt; N; i++) pthread_join(tids[i], NULL);
+    return 0;
+}</div>
+    <div class="bug-question">What is the bug?</div>
+    <select class="bug-select" onchange="checkBug(1, this.value, this)">
+      <option value="">— choose an answer —</option>
+      <option value="a">pthread_join must be called inside the creation loop</option>
+      <option value="b">All threads share a pointer to the same loop variable i; by the time they run, i may have changed</option>
+      <option value="c">print_id casts arg to int* but should cast to long*</option>
+      <option value="d">N must be declared with #define before including pthread.h</option>
+    </select>
+    <div class="feedback-box" id="fb1"></div>
+  </div>
+
+  <!-- Bug 3 -->
+  <div class="bug-card">
+    <h3>Bug 3 — Potential deadlock on error</h3>
+    <div class="code-block"><span style="color:#6a9955">/* counter.c — increment shared counter safely */</span>
+#include &lt;stdio.h&gt;
+#include &lt;pthread.h&gt;
+
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+int counter = 0;
+
+void *increment(void *arg) {
+    pthread_mutex_lock(&amp;lock);
+    if (counter &lt; 0) {
+        fprintf(stderr, "Invalid counter\n");
+        <span class="bug-highlight">return NULL;  /* ??? — exits without unlocking */</span>
+    }
+    counter++;
+    pthread_mutex_unlock(&amp;lock);
+    return NULL;
+}</div>
+    <div class="bug-question">What is the bug?</div>
+    <select class="bug-select" onchange="checkBug(2, this.value, this)">
+      <option value="">— choose an answer —</option>
+      <option value="a">counter must be declared volatile for threads to see updates</option>
+      <option value="b">PTHREAD_MUTEX_INITIALIZER should not be used for global mutexes</option>
+      <option value="c">The early return exits without calling pthread_mutex_unlock; any subsequent thread trying to lock will deadlock</option>
+      <option value="d">fprintf() is not thread-safe inside a locked critical section</option>
+    </select>
+    <div class="feedback-box" id="fb2"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ TAB 3 -->
+<div class="tab-panel" id="tab2">
+  <h2>Complete the Code — fill in the 6 blanks in a parallel array-sum program</h2>
+  <div class="code-fill" id="codeFill"></div>
+  <div class="tab3-controls">
+    <button class="btn btn-primary" onclick="runCode()">▶ Run (simulated)</button>
+    <button class="btn btn-muted" onclick="resetFill()">Reset</button>
+    <button class="btn btn-warning" onclick="showSolution()">Show Solution</button>
+    <span class="score-badge" id="fillScore"></span>
+  </div>
+  <div class="terminal-output" id="termOut"></div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// TAB 1 DATA
+// ══════════════════════════════════════════════════════════
+const fns = [
+  { id:'f0', name:'pthread_create' },
+  { id:'f1', name:'pthread_join' },
+  { id:'f2', name:'pthread_exit' },
+  { id:'f3', name:'pthread_self' },
+  { id:'f4', name:'pthread_mutex_lock' },
+  { id:'f5', name:'pthread_mutex_unlock' },
+  { id:'f6', name:'pthread_mutex_init' },
+  { id:'f7', name:'pthread_mutex_destroy' },
+  { id:'f8', name:'pthread_detach' },
+  { id:'f9', name:'pthread_attr_setdetachstate' },
+];
+const descs = [
+  { id:'d0', text:'Starts a new thread; takes thread ID pointer, attributes, function pointer, and argument', match:'f0' },
+  { id:'d1', text:'Blocks the caller until the specified thread terminates; retrieves return value', match:'f1' },
+  { id:'d2', text:'Terminates the calling thread and optionally returns a value to pthread_join', match:'f2' },
+  { id:'d3', text:'Returns the thread ID of the calling thread', match:'f3' },
+  { id:'d4', text:'Acquires a mutex; blocks if already held by another thread', match:'f4' },
+  { id:'d5', text:'Releases a mutex; unblocks one waiting thread', match:'f5' },
+  { id:'d6', text:'Initialises a mutex variable with optional attributes', match:'f6' },
+  { id:'d7', text:'Destroys a mutex and releases its resources; mutex must be unlocked', match:'f7' },
+  { id:'d8', text:'Marks a thread as detached; resources freed automatically on termination (no join needed)', match:'f8' },
+  { id:'d9', text:'Sets the detach state attribute before thread creation', match:'f9' },
+];
+
+// Shuffle descs for display
+const shuffled = [...descs].sort(() => Math.random() - 0.5);
+
+let selectedFn = null, selectedDesc = null;
+const pairs = {}; // fnId → descId
+
+function buildMatcher() {
+  const fnList = document.getElementById('fnList');
+  const descList = document.getElementById('descList');
+  fnList.innerHTML = '';
+  descList.innerHTML = '';
+  fns.forEach(f => {
+    const b = document.createElement('button');
+    b.className = 'fn-btn';
+    b.id = 'fn_'+f.id;
+    b.textContent = f.name + '()';
+    b.onclick = () => selectFn(f.id);
+    fnList.appendChild(b);
+  });
+  shuffled.forEach(d => {
+    const b = document.createElement('button');
+    b.className = 'desc-btn';
+    b.id = 'desc_'+d.id;
+    b.textContent = d.text;
+    b.onclick = () => selectDesc(d.id);
+    descList.appendChild(b);
+  });
+}
+
+function selectFn(id) {
+  if (document.getElementById('fn_'+id).classList.contains('matched')) return;
+  if (selectedFn) document.getElementById('fn_'+selectedFn).classList.remove('selected');
+  selectedFn = id;
+  document.getElementById('fn_'+id).classList.add('selected');
+  tryMatch();
+}
+function selectDesc(id) {
+  if (document.getElementById('desc_'+id).classList.contains('matched')) return;
+  if (selectedDesc) document.getElementById('desc_'+selectedDesc).classList.remove('selected');
+  selectedDesc = id;
+  document.getElementById('desc_'+id).classList.add('selected');
+  tryMatch();
+}
+function tryMatch() {
+  if (!selectedFn || !selectedDesc) return;
+  pairs[selectedFn] = selectedDesc;
+  selectedFn = null; selectedDesc = null;
+}
+function checkAll() {
+  let correct = 0;
+  Object.entries(pairs).forEach(([fId, dId]) => {
+    const fnBtn  = document.getElementById('fn_'+fId);
+    const dscBtn = document.getElementById('desc_'+dId);
+    const desc = descs.find(d => d.id === dId);
+    if (desc && desc.match === fId) {
+      fnBtn.classList.add('matched'); fnBtn.classList.remove('selected');
+      dscBtn.classList.add('matched'); dscBtn.classList.remove('selected');
+      correct++;
+    } else {
+      fnBtn.classList.add('wrong-flash'); dscBtn.classList.add('wrong-flash');
+      setTimeout(() => { fnBtn.classList.remove('wrong-flash','selected'); dscBtn.classList.remove('wrong-flash','selected'); }, 500);
+      fnBtn.classList.remove('selected'); dscBtn.classList.remove('selected');
+    }
+  });
+  // clear pending
+  selectedFn = null; selectedDesc = null;
+  const total = Object.keys(pairs).length;
+  document.getElementById('matchScore').textContent = `${correct} / ${fns.length} matched`;
+  Object.keys(pairs).forEach(k => delete pairs[k]);
+}
+function showAllAnswers() {
+  fns.forEach(f => {
+    document.getElementById('fn_'+f.id).classList.add('matched');
+  });
+  shuffled.forEach(d => {
+    document.getElementById('desc_'+d.id).classList.add('matched');
+  });
+  document.getElementById('matchScore').textContent = 'Answers revealed — score capped at 5/10';
+}
+function resetMatcher() {
+  selectedFn = null; selectedDesc = null;
+  Object.keys(pairs).forEach(k => delete pairs[k]);
+  document.getElementById('matchScore').textContent = '';
+  buildMatcher();
+}
+
+// ══════════════════════════════════════════════════════════
+// TAB 2 DATA
+// ══════════════════════════════════════════════════════════
+const bugAnswers = ['b','b','c'];
+const bugFeedback = [
+  {
+    b: 'Correct! main() calls return 0 immediately after pthread_create. The OS terminates the process, killing the thread before it can print. Fix: add pthread_join(tid, NULL); before return 0;',
+    a: 'Incorrect. The argument order is correct: (tid_ptr, attr, function, arg).',
+    c: 'Incorrect. Thread functions must return void*, not int. The function signature is correct.',
+    d: 'Incorrect. printf() is thread-safe in Linux (uses internal locks). The bug is elsewhere.',
+  },
+  {
+    b: 'Correct! All threads receive &i — a pointer to the SAME loop variable. By the time a thread dereferences it, i has likely incremented. Fix: pass a pointer to a per-thread copy, e.g., int *arg = malloc(sizeof(int)); *arg = i;',
+    a: 'Incorrect. Joining in the creation loop would serialise threads (defeating the purpose), but it would not fix the shared-pointer bug.',
+    c: 'Incorrect. On most 64-bit systems int and long are both fine for small numbers. The fundamental bug is a data race on i.',
+    d: 'Incorrect. #define placement does not affect this bug.',
+  },
+  {
+    c: 'Correct! The function locks the mutex then returns early in the error path without calling pthread_mutex_unlock. Any other thread calling pthread_mutex_lock will block forever — a deadlock. Fix: call pthread_mutex_unlock(&lock); before the early return.',
+    a: 'Incorrect. volatile prevents compiler optimisations but does not fix mutex handling. The bug is in the control flow.',
+    b: 'Incorrect. PTHREAD_MUTEX_INITIALIZER is the standard way to initialise a statically-allocated mutex. It is perfectly valid.',
+    d: 'Incorrect. fprintf() inside a critical section is fine; the danger is the missing unlock.',
+  },
+];
+
+function checkBug(idx, val, sel) {
+  const fb = document.getElementById('fb'+idx);
+  if (!val) { fb.className='feedback-box'; return; }
+  const isCorrect = val === bugAnswers[idx];
+  fb.textContent = bugFeedback[idx][val] || '';
+  fb.className = 'feedback-box show ' + (isCorrect ? 'feedback-correct' : 'feedback-wrong');
+  if (isCorrect) sel.style.borderColor = '#38a169';
+  else sel.style.borderColor = '#e53e3e';
+}
+
+// ══════════════════════════════════════════════════════════
+// TAB 3 DATA
+// ══════════════════════════════════════════════════════════
+const blanks = [
+  { id:'b0', opts:['pthread_t','int','void*','long'], answer:'pthread_t', hint:'Thread handle type' },
+  { id:'b1', opts:['pthread_mutex_t','pthread_attr_t','pthread_cond_t','pthread_key_t'], answer:'pthread_mutex_t', hint:'Mutual exclusion type' },
+  { id:'b2', opts:['pthread_create','pthread_join','pthread_exit','fork'], answer:'pthread_create', hint:'Start a new thread' },
+  { id:'b3', opts:['pthread_mutex_lock','pthread_mutex_trylock','pthread_mutex_unlock','pthread_mutex_init'], answer:'pthread_mutex_lock', hint:'Acquire the mutex before modifying shared data' },
+  { id:'b4', opts:['pthread_mutex_unlock','pthread_mutex_destroy','pthread_mutex_lock','pthread_exit'], answer:'pthread_mutex_unlock', hint:'Release the mutex after modifying shared data' },
+  { id:'b5', opts:['pthread_join','pthread_detach','pthread_exit','pthread_cancel'], answer:'pthread_join', hint:'Wait for thread to finish and collect result' },
+];
+
+const codeTemplate = `#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#define N 4
+#define SIZE 1000000
+
+[BLANK_0] threads[N];          /* array of thread handles   */
+[BLANK_1] lock;                /* protects g_total          */
+long g_total = 0;
+long g_array[SIZE];
+
+typedef struct { int start; int end; } Args;
+
+void *partial_sum(void *arg) {
+    Args *a = (Args *)arg;
+    long local = 0;
+    for (int i = a->start; i < a->end; i++)
+        local += g_array[i];
+    [BLANK_2](&lock);          /* lock before updating shared total */
+    g_total += local;
+    [BLANK_3](&lock);          /* unlock after update               */
+    return NULL;
+}
+
+int main(void) {
+    for (int i = 0; i < SIZE; i++) g_array[i] = 1;
+    pthread_mutex_init(&lock, NULL);
+    Args args[N];
+    int chunk = SIZE / N;
+    for (int i = 0; i < N; i++) {
+        args[i] = (Args){ i*chunk, (i+1)*chunk };
+        [BLANK_4](&threads[i], NULL, partial_sum, &args[i]);
+    }
+    for (int i = 0; i < N; i++)
+        [BLANK_5](&threads[i], NULL);   /* wait for all threads */
+    printf("Total: %ld (expected %d)\\n", g_total, SIZE);
+    pthread_mutex_destroy(&lock);
+    return 0;
+}`;
+
+// mapping: BLANK_n → which blank index
+const blankMap = ['b0','b1','b2','b3','b4','b5'];
+
+function buildFillCode() {
+  let html = '';
+  const lines = codeTemplate.split('\n');
+  lines.forEach(line => {
+    let l = escHtml(line);
+    blanks.forEach((b, i) => {
+      const ph = `[BLANK_${i}]`;
+      if (l.includes(escHtml(ph))) {
+        const opts = b.opts.map(o => `<option value="${o}"${o===b.answer?'':''} >${o}</option>`).join('');
+        const sel = `<select class="blank-select" id="sel_${b.id}" title="${b.hint}"><option value="">___</option>${opts}</select>`;
+        l = l.replace(escHtml(ph), sel);
+      }
+    });
+    html += l + '\n';
+  });
+  document.getElementById('codeFill').innerHTML = html;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function runCode() {
+  let correct = 0;
+  blanks.forEach(b => {
+    const sel = document.getElementById('sel_'+b.id);
+    if (!sel) return;
+    if (sel.value === b.answer) { sel.classList.add('correct-sel'); sel.classList.remove('wrong-sel'); correct++; }
+    else { sel.classList.add('wrong-sel'); sel.classList.remove('correct-sel'); }
+  });
+  const term = document.getElementById('termOut');
+  document.getElementById('fillScore').textContent = `${correct} / ${blanks.length} correct`;
+  if (correct === blanks.length) {
+    term.className = 'terminal-output show';
+    term.innerHTML = `$ gcc -o sum sum.c -pthread && ./sum\nTotal: 1000000 (expected 1000000)\n\n<span style="color:#a8d8a8">✓ All ${blanks.length} blanks correct — program compiles and produces the expected output.</span>`;
+  } else {
+    term.className = 'terminal-output show';
+    term.innerHTML = `<span class="error-output">$ gcc -o sum sum.c -pthread\nsum.c: error: ${blanks.length - correct} blank(s) incorrect.\nHint: check blanks highlighted in red. Re-read the pthread man pages.</span>`;
+  }
+}
+
+function resetFill() {
+  document.getElementById('fillScore').textContent = '';
+  document.getElementById('termOut').className = 'terminal-output';
+  buildFillCode();
+}
+
+function showSolution() {
+  blanks.forEach(b => {
+    const sel = document.getElementById('sel_'+b.id);
+    if (!sel) return;
+    sel.value = b.answer;
+    sel.classList.add('correct-sel');
+    sel.classList.remove('wrong-sel');
+  });
+  document.getElementById('fillScore').textContent = 'Solution revealed';
+  document.getElementById('termOut').className = 'terminal-output show';
+  document.getElementById('termOut').innerHTML = `$ gcc -o sum sum.c -pthread && ./sum\nTotal: 1000000 (expected 1000000)`;
+}
+
+// ══════════════════════════════════════════════════════════
+// TABS
+// ══════════════════════════════════════════════════════════
+function switchTab(idx) {
+  document.querySelectorAll('.tab-panel').forEach((p,i) => p.classList.toggle('active', i===idx));
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', i===idx));
+}
+
+// INIT
+buildMatcher();
+buildFillCode();
+</script>
+</body>
+</html>
