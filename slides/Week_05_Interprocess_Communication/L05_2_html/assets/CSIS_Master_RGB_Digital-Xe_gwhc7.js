@@ -1,1 +1,0 @@
-var e=`/cs4023OperatingSystems/slides/Week_05_Interprocess_Communication/L05_2_html/assets/CSIS_Master_RGB_Digital-C1Rq25Ab.png`;export{e as t};

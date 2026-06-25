@@ -1,1 +1,0 @@
-var e=`/cs4023OperatingSystems/slides/Week_06_CPU_Scheduling/L06_2_html/assets/CSIS_Master_RGB_Digital-C1Rq25Ab.png`;export{e as t};
