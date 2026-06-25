@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tool 3.1 — Process State Machine | CS4023</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+  header { background: #003366; padding: 1rem 2rem; border-bottom: 3px solid #ff8c00; }
+  header h1 { font-size: 1.4rem; color: #fff; }
+  header p { font-size: 0.85rem; color: #94a3b8; margin-top: 0.2rem; }
+  .main { display: flex; gap: 1rem; padding: 1rem; height: calc(100vh - 80px); }
+  .canvas-area { flex: 1; background: #1e293b; border-radius: 12px; position: relative; overflow: hidden; }
+  .sidebar { width: 300px; display: flex; flex-direction: column; gap: 0.75rem; }
+  .card { background: #1e293b; border-radius: 10px; padding: 1rem; }
+  .card h3 { font-size: 0.9rem; color: #ff8c00; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+  .progress-bar { background: #334155; height: 10px; border-radius: 5px; overflow: hidden; margin-bottom: 0.5rem; }
+  .progress-fill { background: #ff8c00; height: 100%; transition: width 0.4s ease; }
+  .score-text { font-size: 0.85rem; color: #94a3b8; }
+  .pcb-content { font-size: 0.8rem; line-height: 1.6; color: #cbd5e1; }
+  .pcb-field { background: #0f172a; padding: 0.4rem 0.6rem; border-radius: 6px; margin: 0.25rem 0; border-left: 3px solid #ff8c00; }
+  .legend { display: flex; flex-direction: column; gap: 0.5rem; }
+  .legend-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; }
+  .legend-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+  svg text { font-family: 'Segoe UI', Arial, sans-serif; }
+  .btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  button { padding: 0.4rem 0.9rem; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-weight: 600; }
+  .btn-primary { background: #ff8c00; color: #000; }
+  .btn-primary:hover { background: #ffab40; }
+  .btn-secondary { background: #334155; color: #e2e8f0; }
+  .btn-secondary:hover { background: #475569; }
+  /* Popup */
+  .popup-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; }
+  .popup-overlay.active { display: flex; }
+  .popup { background: #1e293b; border: 2px solid #ff8c00; border-radius: 14px; padding: 2rem; max-width: 420px; width: 90%; }
+  .popup h2 { font-size: 1rem; margin-bottom: 0.5rem; color: #ff8c00; }
+  .popup p { font-size: 0.9rem; color: #94a3b8; margin-bottom: 1rem; }
+  .option-btn { display: block; width: 100%; text-align: left; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 8px; padding: 0.7rem 1rem; margin: 0.4rem 0; cursor: pointer; font-size: 0.88rem; transition: all 0.2s; font-weight: 400; }
+  .option-btn:hover { border-color: #ff8c00; background: #1a2744; }
+  .option-btn.correct { background: #14532d; border-color: #22c55e; color: #86efac; }
+  .option-btn.wrong { background: #450a0a; border-color: #ef4444; color: #fca5a5; }
+  .feedback { font-size: 0.85rem; margin-top: 0.8rem; padding: 0.6rem; border-radius: 8px; }
+  .feedback.correct { background: #14532d; color: #86efac; }
+  .feedback.wrong { background: #450a0a; color: #fca5a5; }
+  /* Final screen */
+  .final-screen { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 200; align-items: center; justify-content: center; }
+  .final-screen.active { display: flex; }
+  .final-card { background: #1e293b; border: 2px solid #ff8c00; border-radius: 16px; padding: 2.5rem; text-align: center; max-width: 380px; }
+  .final-card h2 { font-size: 2rem; color: #ff8c00; margin-bottom: 0.5rem; }
+  .final-card p { color: #94a3b8; margin-bottom: 1.5rem; }
+  .score-display { font-size: 3rem; font-weight: 700; color: #fff; margin: 1rem 0; }
+  /* Responsive / mobile */
+  @media (max-width: 768px) {
+    .main { flex-direction: column; height: auto; min-height: calc(100vh - 80px); }
+    .canvas-area { height: 60vw; min-height: 280px; }
+    .sidebar { width: 100%; }
+    .popup-overlay { align-items: flex-start; padding: 1rem; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .popup { max-height: 90vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎮 Tool 3.1 — Process State Machine</h1>
+  <p>CS4023 Operating Systems · Click two states to identify the transition event</p>
+</header>
+
+<div class="main">
+  <div class="canvas-area" id="canvasArea">
+    <svg id="stateSvg" width="100%" height="100%" viewBox="0 0 700 500"></svg>
+  </div>
+
+  <div class="sidebar">
+    <div class="card">
+      <h3>Progress</h3>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+      <div class="score-text" id="progressText">0 / 8 transitions identified</div>
+    </div>
+
+    <div class="card" id="pcbCard">
+      <h3>PCB Inspector</h3>
+      <div class="pcb-content" id="pcbContent">
+        <p style="color:#475569;font-style:italic;">Select a correct transition to see PCB changes</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Legend</h3>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#003366;border:2px solid #4a80c4"></div><span>State node</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ff8c00"></div><span>Selected node</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div><span>Revealed transition</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#64748b"></div><span>Hidden transition</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Controls</h3>
+      <div class="btn-row">
+        <button class="btn-secondary" onclick="revealAll()">Show All (50% penalty)</button>
+        <button class="btn-secondary" onclick="resetGame()">Reset</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Popup -->
+<div class="popup-overlay" id="popupOverlay">
+  <div class="popup">
+    <h2 id="popupTitle">What causes this transition?</h2>
+    <p id="popupSubtitle"></p>
+    <div id="popupOptions"></div>
+    <div class="feedback" id="popupFeedback" style="display:none"></div>
+    <div style="margin-top:1rem; text-align:right">
+      <button class="btn-secondary" id="popupClose" onclick="closePopup()" style="display:none">Continue →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Final screen -->
+<div class="final-screen" id="finalScreen">
+  <div class="final-card">
+    <h2>🎉 Complete!</h2>
+    <div class="score-display" id="finalScore">--</div>
+    <p id="finalMsg">You identified all 8 transitions.</p>
+    <button class="btn-primary" onclick="resetGame()">Play Again</button>
+  </div>
+</div>
+
+<script>
+const transitions = [
+  { from:"New", to:"Ready", event:"OS admits process", distractors:["Process calls exec()","Process receives CPU"], pcb:"state → READY\nPID assigned\nMemory mapped\nAdded to ready queue" },
+  { from:"Ready", to:"Running", event:"Scheduler dispatches process", distractors:["I/O completes","Process calls sleep()"], pcb:"state → RUNNING\nCPU registers loaded from PCB\nProgram Counter restored" },
+  { from:"Running", to:"Ready", event:"Timer interrupt / preemption", distractors:["Process calls wait()","Process receives signal"], pcb:"state → READY\nPC and all registers saved to PCB\nProcess re-queued" },
+  { from:"Running", to:"Waiting", event:"Process requests I/O or blocks", distractors:["Timer expires","Scheduler preempts"], pcb:"state → WAITING\nAdded to I/O wait queue\nCPU given to another process" },
+  { from:"Waiting", to:"Ready", event:"I/O completes / event occurs", distractors:["Timer interrupt","Scheduler selects process"], pcb:"state → READY\nRemoved from wait queue\nAdded back to ready queue" },
+  { from:"Running", to:"Terminated", event:"Process calls exit() or is killed", distractors:["Process requests I/O","Timer interrupt"], pcb:"state → ZOMBIE\nResources freed\nPCB kept until parent calls wait()" },
+  { from:"New", to:"Terminated", event:"Process creation fails", distractors:["fork() succeeds","Parent calls exec()"], pcb:"PCB never fully initialised\nImmediately deallocated" },
+  { from:"Waiting", to:"Terminated", event:"Process killed while waiting (SIGKILL)", distractors:["I/O completes","Scheduler selects it"], pcb:"state → TERMINATED\nRemoved from wait queue\nSIGKILL delivered" },
+];
+
+const statePositions = {
+  "New":        { x: 100, y: 80 },
+  "Ready":      { x: 100, y: 250 },
+  "Running":    { x: 350, y: 250 },
+  "Waiting":    { x: 590, y: 250 },
+  "Terminated": { x: 590, y: 420 },
+};
+const R = 48;
+
+let revealed = new Set();
+let score = 0;
+let selected = null;
+let currentTransition = null;
+let attemptMap = {}; // key -> attempts
+
+function getKey(t) { return `${t.from}->${t.to}`; }
+
+function drawSvg() {
+  const svg = document.getElementById('stateSvg');
+  svg.innerHTML = '';
+
+  // Arrow defs
+  svg.innerHTML += `<defs>
+    <marker id="arrowRevealed" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#22c55e"/>
+    </marker>
+    <marker id="arrowHidden" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#334155"/>
+    </marker>
+  </defs>`;
+
+  // Draw edges
+  transitions.forEach(t => {
+    const from = statePositions[t.from];
+    const to = statePositions[t.to];
+    const key = getKey(t);
+    const isRevealed = revealed.has(key);
+    const color = isRevealed ? '#22c55e' : '#334155';
+    const markerEnd = isRevealed ? 'url(#arrowRevealed)' : 'url(#arrowHidden)';
+    const strokeWidth = isRevealed ? 2.5 : 1.5;
+    const strokeDash = isRevealed ? '' : '6,4';
+
+    // Compute edge from circle border, with slight curve for reverse paths
+    const dx = to.x - from.x, dy = to.y - from.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const ux = dx/dist, uy = dy/dist;
+
+    // Perpendicular for curved edges between same-row nodes
+    const isCurved = (t.from === 'Running' && t.to === 'Ready');
+    let sx = from.x + ux * R, sy = from.y + uy * R;
+    let ex = to.x - ux * R, ey = to.y - uy * R;
+
+    let pathD;
+    if (isCurved) {
+      const cx1 = (from.x + to.x) / 2, cy1 = from.y - 60;
+      pathD = `M${sx},${sy} Q${cx1},${cy1} ${ex},${ey}`;
+      // Recompute endpoint tangent for curved
+      const tx = ex - cx1, ty = ey - cy1;
+      const tl = Math.sqrt(tx*tx+ty*ty);
+      ex = to.x - (tx/tl)*R; ey = to.y - (ty/tl)*R;
+      pathD = `M${from.x + (cx1-from.x)/Math.sqrt((cx1-from.x)**2+(cy1-from.y)**2)*R},${from.y + (cy1-from.y)/Math.sqrt((cx1-from.x)**2+(cy1-from.y)**2)*R} Q${cx1},${cy1} ${ex},${ey}`;
+    } else {
+      pathD = `M${sx},${sy} L${ex},${ey}`;
+    }
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', pathD);
+    path.setAttribute('stroke', color);
+    path.setAttribute('stroke-width', strokeWidth);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke-dasharray', strokeDash);
+    path.setAttribute('marker-end', markerEnd);
+    svg.appendChild(path);
+
+    // Event label on revealed edges
+    if (isRevealed) {
+      const lx = (from.x + to.x) / 2;
+      const ly = isCurved ? from.y - 35 : (from.y + to.y) / 2 - 10;
+      const labelEl = document.createElementNS('http://www.w3.org/2000/svg','text');
+      labelEl.setAttribute('x', lx);
+      labelEl.setAttribute('y', ly);
+      labelEl.setAttribute('text-anchor','middle');
+      labelEl.setAttribute('font-size','10');
+      labelEl.setAttribute('fill','#86efac');
+      const shortEvent = t.event.length > 30 ? t.event.substring(0,28)+'…' : t.event;
+      labelEl.textContent = shortEvent;
+      svg.appendChild(labelEl);
+    }
+  });
+
+  // Draw nodes
+  Object.entries(statePositions).forEach(([name, pos]) => {
+    const isSelected = (selected === name);
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('cursor','pointer');
+    g.addEventListener('click', () => selectNode(name));
+
+    const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circle.setAttribute('cx', pos.x);
+    circle.setAttribute('cy', pos.y);
+    circle.setAttribute('r', R);
+    circle.setAttribute('fill', isSelected ? '#ff8c00' : '#003366');
+    circle.setAttribute('stroke', isSelected ? '#ffab40' : '#4a80c4');
+    circle.setAttribute('stroke-width', isSelected ? 3 : 2);
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg','text');
+    text.setAttribute('x', pos.x);
+    text.setAttribute('y', pos.y + 5);
+    text.setAttribute('text-anchor','middle');
+    text.setAttribute('fill', '#fff');
+    text.setAttribute('font-size', '13');
+    text.setAttribute('font-weight', '600');
+    text.textContent = name;
+
+    g.appendChild(circle);
+    g.appendChild(text);
+    svg.appendChild(g);
+  });
+}
+
+function selectNode(name) {
+  if (selected === null) {
+    selected = name;
+    drawSvg();
+  } else if (selected === name) {
+    selected = null;
+    drawSvg();
+  } else {
+    const from = selected;
+    const to = name;
+    selected = null;
+    drawSvg();
+    const t = transitions.find(t => t.from === from && t.to === to);
+    if (!t) return; // no such transition
+    const key = getKey(t);
+    if (revealed.has(key)) return; // already done
+    openPopup(t);
+  }
+}
+
+function openPopup(t) {
+  currentTransition = t;
+  document.getElementById('popupTitle').textContent = `${t.from} → ${t.to}`;
+  document.getElementById('popupSubtitle').textContent = 'What event causes this transition?';
+  document.getElementById('popupFeedback').style.display = 'none';
+  document.getElementById('popupClose').style.display = 'none';
+
+  const options = [t.event, ...t.distractors].sort(() => Math.random() - 0.5);
+  const container = document.getElementById('popupOptions');
+  container.innerHTML = '';
+  options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.textContent = opt;
+    btn.onclick = () => handleAnswer(opt, btn);
+    container.appendChild(btn);
+  });
+
+  document.getElementById('popupOverlay').classList.add('active');
+}
+
+function handleAnswer(choice, btn) {
+  const t = currentTransition;
+  const key = getKey(t);
+  if (!attemptMap[key]) attemptMap[key] = 0;
+  attemptMap[key]++;
+
+  const fb = document.getElementById('popupFeedback');
+  fb.style.display = 'block';
+
+  if (choice === t.event) {
+    btn.classList.add('correct');
+    const pts = attemptMap[key] === 1 ? 1 : 0.5;
+    score += pts;
+    fb.className = 'feedback correct';
+    fb.textContent = `✅ Correct! ${pts === 1 ? 'Full point.' : 'Half point (2nd attempt).'}`;
+    revealed.add(key);
+    document.getElementById('popupClose').style.display = 'inline-block';
+    // Disable all buttons
+    document.querySelectorAll('#popupOptions .option-btn').forEach(b => b.onclick = null);
+    // Update PCB
+    showPCB(t);
+    drawSvg();
+    updateProgress();
+  } else {
+    btn.classList.add('wrong');
+    fb.className = 'feedback wrong';
+    fb.textContent = `❌ Not quite. That describes a different transition. Try again!`;
+  }
+}
+
+function showPCB(t) {
+  const lines = t.pcb.split('\n');
+  const html = lines.map(l => `<div class="pcb-field">${l}</div>`).join('');
+  document.getElementById('pcbContent').innerHTML = `<p style="font-size:0.75rem;color:#64748b;margin-bottom:0.4rem">After <strong style="color:#ff8c00">${t.from} → ${t.to}</strong>:</p>${html}`;
+}
+
+function closePopup() {
+  document.getElementById('popupOverlay').classList.remove('active');
+  currentTransition = null;
+  if (revealed.size === transitions.length) showFinal();
+}
+
+function updateProgress() {
+  const pct = (revealed.size / transitions.length) * 100;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = `${revealed.size} / ${transitions.length} transitions identified`;
+}
+
+function revealAll() {
+  transitions.forEach(t => {
+    const key = getKey(t);
+    if (!revealed.has(key)) {
+      revealed.add(key);
+      // No score for these
+    }
+  });
+  drawSvg();
+  updateProgress();
+  document.getElementById('popupOverlay').classList.remove('active');
+  setTimeout(showFinal, 400);
+}
+
+function showFinal() {
+  const maxScore = transitions.length;
+  const pct = Math.round((score / maxScore) * 100);
+  document.getElementById('finalScore').textContent = pct + '%';
+  const msg = pct === 100 ? '🌟 Perfect! All transitions first attempt.' :
+              pct >= 75 ? '👍 Well done! A few needed a second try.' :
+              pct >= 50 ? '📚 Good effort. Review any transitions you found tricky.' :
+              '🔄 Keep practising — review the lecture slides and try again.';
+  document.getElementById('finalMsg').textContent = msg;
+  document.getElementById('finalScreen').classList.add('active');
+}
+
+function resetGame() {
+  revealed.clear();
+  score = 0;
+  selected = null;
+  currentTransition = null;
+  attemptMap = {};
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('progressText').textContent = '0 / 8 transitions identified';
+  document.getElementById('pcbContent').innerHTML = '<p style="color:#475569;font-style:italic;">Select a correct transition to see PCB changes</p>';
+  document.getElementById('finalScreen').classList.remove('active');
+  document.getElementById('popupOverlay').classList.remove('active');
+  drawSvg();
+}
+
+drawSvg();
+</script>
+</body>
+</html>

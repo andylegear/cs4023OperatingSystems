@@ -1,0 +1,13 @@
+import{E as e,H as t,R as n,S as r,X as i,_ as a,_t as o,g as s,ht as c,x as l}from"./modules/shiki-Dm5aQrj-.js";import{et as u,tt as d}from"./index-Q60O2a_5.js";import{t as f}from"./default-1seSJYK9.js";var p={__name:`L09_2_Memory_Contiguous_Allocation_and_Segmentation.md__slidev_8`,setup(p){let{$slidev:m,$nav:h,$clicksContext:g,$clicks:_,$page:v,$renderContext:y,$frontmatter:b}=d();return g.setup(),(d,p)=>{let m=t(`CodeBlockWrapper`);return n(),a(f,o(e(c(u)(c(b),7))),{default:i(()=>[p[1]||=s(`h1`,null,`Dynamic Partitions and External Fragmentation`,-1),p[2]||=s(`p`,null,[l(`Allocate a partition `),s(`strong`,null,`exactly`),l(` the size needed by each process.`)],-1),r(m,{title:``,ranges:[]},{default:i(()=>[...p[0]||=[s(`pre`,{class:`shiki shiki-themes vitesse-dark vitesse-light slidev-code`,style:{"--shiki-dark":`#dbd7caee`,"--shiki-light":`#393a34`,"--shiki-dark-bg":`#121212`,"--shiki-light-bg":`#ffffff`}},[s(`code`,{class:`language-text`},[s(`span`,{class:`line`},[s(`span`,null,` Initial:          After P1(200K), P2(300K), P3(100K) loaded:`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`  ┌──────────┐      ┌──────────┐`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`  │  OS      │      │  OS      │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`  ├──────────┤      ├──────────┤`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`  │          │      │ P1 200K  │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`  │          │      ├──────────┤`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`  │  Free    │      │ P2 300K  │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`  │  720 KB  │      ├──────────┤`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`  │          │      │ P3 100K  │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`  │          │      ├──────────┤`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`  └──────────┘      │ Free 120K│`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`                    └──────────┘`)])])],-1)]]),_:1}),p[3]||=s(`p`,null,[s(`strong`,null,`External fragmentation:`),l(` free memory exists in `),s(`strong`,null,`total`),l(` but is split into small, non-contiguous holes — no single hole is large enough for a new process.`)],-1),p[4]||=s(`p`,null,[s(`strong`,null,`Compaction:`),l(` relocate all processes to one end, consolidating free space.`)],-1),p[5]||=s(`ul`,null,[s(`li`,null,`Requires execution-time binding (base register adjustment)`),s(`li`,null,`I/O-bound processes cannot be moved while I/O is in progress`),s(`li`,null,[s(`strong`,null,`Expensive:`),l(` may require moving hundreds of MB`)])],-1)]),_:1},16)}}};export{p as default};

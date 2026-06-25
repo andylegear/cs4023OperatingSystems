@@ -1,0 +1,11 @@
+import{E as e,H as t,R as n,S as r,X as i,_ as a,_t as o,g as s,ht as c,x as l}from"./modules/shiki-Dm5aQrj-.js";import{et as u,tt as d}from"./index-Q60O2a_5.js";import{t as f}from"./default-1seSJYK9.js";var p={__name:`L09_2_Memory_Contiguous_Allocation_and_Segmentation.md__slidev_12`,setup(p){let{$slidev:m,$nav:h,$clicksContext:g,$clicks:_,$page:v,$renderContext:y,$frontmatter:b}=d();return g.setup(),(d,p)=>{let m=t(`CodeBlockWrapper`);return n(),a(f,o(e(c(u)(c(b),11))),{default:i(()=>[p[1]||=s(`h1`,null,`Segment Table and Address Translation`,-1),r(m,{title:``,ranges:[]},{default:i(()=>[...p[0]||=[s(`pre`,{class:`shiki shiki-themes vitesse-dark vitesse-light slidev-code`,style:{"--shiki-dark":`#dbd7caee`,"--shiki-light":`#393a34`,"--shiki-dark-bg":`#121212`,"--shiki-light-bg":`#ffffff`}},[s(`code`,{class:`language-text`},[s(`span`,{class:`line`},[s(`span`,null,` CPU generates: <s=1, d=0x100>  (data segment, offset 256)`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`                  Segment Table`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`                 ┌──────┬────────┬────────┐`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`  s=1 ─────────→ │  1   │ 0xA000 │ 0x0400 │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`                 └──────┴────────┴────────┘`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`                         │         │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`                    d < limit?     │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`                   0x100 < 0x0400 ✓│`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`                                   ↓`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`                   physical = 0xA000 + 0x100 = 0xA100`)])])],-1)]]),_:1}),p[2]||=s(`p`,null,[s(`strong`,null,`Hardware:`),l(` the `),s(`strong`,null,`Segment Table Base Register (STBR)`),l(` points to the current process’s segment table in memory.`)],-1),p[3]||=s(`p`,null,[s(`strong`,null,`Intel x86 legacy:`),l(` the segmented memory model (CS, DS, SS, ES registers) is rooted in 8086 segmentation. Modern x86-64 uses flat model (base=0) except for FS/GS used for thread-local storage.`)],-1)]),_:1},16)}}};export{p as default};
