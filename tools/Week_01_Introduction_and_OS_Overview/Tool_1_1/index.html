@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OS Function Classifier — CS4023</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy: #003366;
+    --green: #005335;
+    --correct: #1a7a3e;
+    --wrong: #c0392b;
+    --bg: #f4f6f9;
+    --card-bg: #fff;
+    --border: #d0d7e2;
+    --radius: 8px;
+  }
+
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: var(--bg); color: #222; min-height: 100vh; }
+
+  header {
+    background: var(--navy); color: #fff; padding: 14px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 8px; position: sticky; top: 0; z-index: 100;
+  }
+  header h1 { font-size: clamp(1rem, 3vw, 1.3rem); }
+  #score-box { background: rgba(255,255,255,0.15); border-radius: 20px;
+               padding: 5px 14px; font-size: 1rem; font-weight: bold; white-space: nowrap; }
+
+  #instructions { background: #e8edf5; border-left: 4px solid var(--navy);
+    padding: 10px 16px; margin: 12px 16px; border-radius: 4px; font-size: 0.88rem; color: #333; }
+
+  #main { display: flex; gap: 16px; padding: 12px 16px; flex-wrap: wrap; }
+
+  /* ── Card deck ── */
+  #card-deck { flex: 0 0 min(260px, 100%); }
+  #card-deck h2 { font-size: 0.85rem; text-transform: uppercase; color: #666;
+                  margin-bottom: 8px; letter-spacing: .05em; }
+  #cards-container { display: flex; flex-direction: column; gap: 7px; }
+
+  .card {
+    background: var(--card-bg); border: 2px solid var(--border);
+    border-radius: var(--radius); padding: 9px 12px; font-size: 0.86rem;
+    cursor: grab; user-select: none; transition: box-shadow .15s, opacity .15s;
+    touch-action: none;
+  }
+  .card:hover { box-shadow: 0 3px 10px rgba(0,51,102,.15); }
+  .card.dragging { opacity: .5; }
+  .card.placed-correct { background: #d4edda; border-color: var(--correct); cursor: default; color: var(--correct); font-weight: 600; }
+  .card.placed-wrong   { background: #fde8e8; border-color: var(--wrong);   cursor: pointer; }
+  .card.placed-wrong:hover { background: #fbd0d0; }
+  .card.placed-wrong::after { content: ' ↩ tap to retry'; font-size: .75em; opacity: .7; }
+  .card.placed-correct::after { content: ' ✓'; }
+
+  /* ── Drop zones ── */
+  #zones { flex: 1 1 0; display: grid;
+           grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+
+  .zone {
+    background: var(--card-bg); border: 2px dashed var(--border);
+    border-radius: var(--radius); padding: 12px;
+    transition: border-color .2s, background .2s; min-height: 160px;
+  }
+  .zone.drag-over { border-color: var(--navy); background: #eaf0f8; }
+  .zone h3 { font-size: 0.88rem; color: var(--navy); margin-bottom: 4px; }
+  .zone .zone-icon { font-size: 1.5rem; margin-bottom: 6px; display: block; }
+  .zone .zone-desc { font-size: 0.75rem; color: #666; margin-bottom: 8px; }
+  .zone-cards { display: flex; flex-direction: column; gap: 5px; }
+
+  /* ── Feedback tooltip ── */
+  .feedback {
+    font-size: 0.75rem; border-radius: 4px; padding: 5px 8px;
+    margin-top: 4px; line-height: 1.4;
+  }
+  .feedback.correct { background: #d4edda; color: #155724; }
+  .feedback.wrong   { background: #fde8e8; color: #721c24; }
+
+  /* ── Buttons ── */
+  #controls { padding: 14px 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+  button {
+    padding: 9px 20px; border: none; border-radius: 6px; cursor: pointer;
+    font-size: 0.9rem; font-weight: 600; transition: opacity .15s;
+  }
+  button:hover { opacity: .85; }
+  #btn-reset  { background: var(--navy); color: #fff; }
+  #btn-reveal { background: var(--green); color: #fff; }
+
+  /* ── Mobile drag ghost ── */
+  #drag-ghost {
+    position: fixed; pointer-events: none; z-index: 9999;
+    background: var(--card-bg); border: 2px solid var(--navy);
+    border-radius: var(--radius); padding: 8px 12px; font-size: 0.85rem;
+    opacity: .85; max-width: 220px; display: none;
+  }
+
+  @media (max-width: 600px) {
+    #main { flex-direction: column; }
+    #card-deck { flex: none; width: 100%; }
+    .card { font-size: 0.82rem; padding: 8px 10px; }
+    .zone { min-height: 100px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🖥️ OS Function Classifier — CS4023</h1>
+  <div id="score-box">Score: <span id="score">0</span> / <span id="total">0</span></div>
+</header>
+
+<div id="instructions">
+  <strong>How to play:</strong> Drag each activity card into the correct OS function category.
+  On mobile, press-and-hold a card then drag it to a zone. Green = correct ✓, Red = wrong ✗.
+</div>
+
+<div id="main">
+  <div id="card-deck">
+    <h2>Activity Cards</h2>
+    <div id="cards-container"></div>
+  </div>
+  <div id="zones"></div>
+</div>
+
+<div id="controls">
+  <button id="btn-reset">↺ Reset</button>
+  <button id="btn-reveal">👁 Reveal All</button>
+</div>
+
+<div id="drag-ghost"></div>
+
+<script>
+const CATEGORIES = [
+  { id: 'pm',  name: 'Process Management', icon: '⚙️',  desc: 'Creating, scheduling, and terminating processes' },
+  { id: 'mm',  name: 'Memory Management',  icon: '🧠',  desc: 'Allocating and managing virtual/physical memory' },
+  { id: 'fs',  name: 'File System',        icon: '📁',  desc: 'Storing, naming, and accessing files on disk' },
+  { id: 'io',  name: 'I/O Management',     icon: '🔌',  desc: 'Controlling hardware devices and data transfers' },
+  { id: 'sec', name: 'Security & Protection', icon: '🔒', desc: 'Access control, authentication, and isolation' },
+];
+
+const CARDS = [
+  { text: 'fork a child process',              cat: 'pm',  exp: 'fork() creates a new PCB and duplicates the parent process context.' },
+  { text: 'schedule next process on CPU',      cat: 'pm',  exp: 'The CPU scheduler selects the next ready process and performs a context switch.' },
+  { text: 'handle SIGKILL signal',             cat: 'pm',  exp: 'Signal delivery and disposition is managed by the OS process manager.' },
+  { text: 'allocate a new PCB',                cat: 'pm',  exp: 'A Process Control Block is created by the OS whenever a new process is spawned.' },
+  { text: 'extend heap with brk()',            cat: 'mm',  exp: 'brk() adjusts the program break, growing the heap segment in the process address space.' },
+  { text: 'map anonymous page',               cat: 'mm',  exp: 'mmap(MAP_ANONYMOUS) asks the kernel to map a zero-filled page into the process address space.' },
+  { text: 'handle page fault',                cat: 'mm',  exp: 'The MMU triggers a page fault exception; the kernel loads the missing page from disk or swap.' },
+  { text: 'reclaim idle process memory',      cat: 'mm',  exp: 'The kernel\'s page reclaim daemon (kswapd) frees pages from inactive processes under memory pressure.' },
+  { text: 'open /home/user/doc.txt',          cat: 'fs',  exp: 'The VFS resolves the path, checks permissions, and returns a file descriptor.' },
+  { text: 'create directory /tmp/work',       cat: 'fs',  exp: 'mkdir() asks the kernel to allocate a new directory inode and add an entry in the parent directory.' },
+  { text: 'read inode 47',                    cat: 'fs',  exp: 'The file system driver reads the inode structure from disk to find the file\'s data block addresses.' },
+  { text: 'flush write buffer to disk',       cat: 'fs',  exp: 'fsync() instructs the kernel to write all dirty pages for a file from the page cache to stable storage.' },
+  { text: 'queue DMA transfer to USB',        cat: 'io',  exp: 'The USB host controller driver submits a transfer descriptor; DMA moves data without CPU involvement.' },
+  { text: 'service keyboard interrupt',       cat: 'io',  exp: 'The keyboard controller raises IRQ1; the CPU executes the registered interrupt service routine.' },
+  { text: 'buffer 512-byte sector read',      cat: 'io',  exp: 'The block layer buffers sector reads in the page cache to reduce physical I/O.' },
+  { text: 'schedule disk arm movement',       cat: 'io',  exp: 'The I/O scheduler reorders pending disk requests to minimise head travel (e.g., SCAN algorithm).' },
+  { text: 'check UID before exec',            cat: 'sec', exp: 'execve() verifies the process has execute permission on the file based on UID/GID and permission bits.' },
+  { text: 'validate memory access in segment',cat: 'sec', exp: 'The MMU checks each virtual address against the process\'s valid memory regions; violations raise SIGSEGV.' },
+  { text: 'set file permission bits',         cat: 'sec', exp: 'chmod() updates the permission bits in the file\'s inode, enforced on every subsequent access.' },
+  { text: 'audit failed login attempt',       cat: 'sec', exp: 'PAM and the kernel audit subsystem log failed authentication events to /var/log/auth.log.' },
+];
+
+// ── State ──
+let score = 0;
+let placed = 0; // how many placed correctly (used to track total answered)
+let dragCard = null; // { el, data }
+
+// ── Shuffle ──
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ── Build DOM ──
+function build() {
+  score = 0; placed = 0;
+  updateScore();
+
+  // Zones
+  const zonesEl = document.getElementById('zones');
+  zonesEl.innerHTML = '';
+  CATEGORIES.forEach(cat => {
+    const zone = document.createElement('div');
+    zone.className = 'zone';
+    zone.dataset.cat = cat.id;
+    zone.innerHTML = `<span class="zone-icon">${cat.icon}</span>
+      <h3>${cat.name}</h3>
+      <p class="zone-desc">${cat.desc}</p>
+      <div class="zone-cards" data-zone="${cat.id}"></div>`;
+    // Desktop drag events
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); handleDrop(cat.id); });
+    zonesEl.appendChild(zone);
+  });
+
+  // Cards
+  const container = document.getElementById('cards-container');
+  container.innerHTML = '';
+  document.getElementById('total').textContent = CARDS.length;
+
+  shuffle(CARDS).forEach(data => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.textContent = data.text;
+    card.dataset.cat = data.cat;
+    card.dataset.text = data.text;
+    card.dataset.exp = data.exp;
+
+    // Desktop drag
+    card.draggable = true;
+    card.addEventListener('dragstart', e => {
+      dragCard = { el: card, data };
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    card.addEventListener('dragend', () => card.classList.remove('dragging'));
+
+    // Touch drag
+    card.addEventListener('touchstart', onTouchStart, { passive: false });
+    card.addEventListener('touchmove',  onTouchMove,  { passive: false });
+    card.addEventListener('touchend',   onTouchEnd,   { passive: false });
+
+    container.appendChild(card);
+  });
+}
+
+function updateScore() {
+  document.getElementById('score').textContent = score;
+}
+
+// ── Drop logic ──
+function handleDrop(zoneCat) {
+  if (!dragCard) return;
+  const { el, data } = dragCard;
+  dragCard = null;
+
+  // Already placed
+  if (el.classList.contains('placed-correct') || el.classList.contains('placed-wrong')) return;
+
+  const correct = data.cat === zoneCat;
+  if (correct) {
+    score++;
+    updateScore();
+    el.classList.add('placed-correct');
+  } else {
+    el.classList.add('placed-wrong');
+  }
+
+  // Move card to zone
+  const zoneCards = document.querySelector(`[data-zone="${zoneCat}"]`);
+  const wrapper = document.createElement('div');
+  wrapper.dataset.wrapperFor = data.text;
+  wrapper.appendChild(el);
+  const fb = document.createElement('div');
+  fb.className = 'feedback ' + (correct ? 'correct' : 'wrong');
+  fb.textContent = correct
+    ? data.exp
+    : `✗ Correct category: ${CATEGORIES.find(c => c.id === data.cat).name}. ${data.exp}`;
+  wrapper.appendChild(fb);
+  zoneCards.appendChild(wrapper);
+
+  // Wrong cards: click to return to deck
+  if (!correct) {
+    el.addEventListener('click', () => returnToDeck(el, data), { once: true });
+  }
+}
+
+function returnToDeck(el, data) {
+  // Remove from zone
+  const wrapper = el.closest('[data-wrapper-for]');
+  if (wrapper) wrapper.remove();
+
+  // Reset card state
+  el.classList.remove('placed-wrong', 'dragging');
+  el.draggable = true;
+
+  // Re-attach drag events (touch listeners are already on the element)
+  el.addEventListener('dragstart', e => {
+    dragCard = { el, data };
+    el.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  el.addEventListener('dragend', () => el.classList.remove('dragging'));
+
+  // Append back to deck
+  document.getElementById('cards-container').appendChild(el);
+}
+
+// ── Touch drag implementation ──
+let touchDragEl = null;
+let touchDragData = null;
+let scrollInterval = null;
+const ghost = document.getElementById('drag-ghost');
+const SCROLL_ZONE = 80;  // px from edge to trigger scroll
+const SCROLL_SPEED = 8; // px per frame
+
+function startAutoScroll(clientY) {
+  stopAutoScroll();
+  const vh = window.innerHeight;
+  if (clientY < SCROLL_ZONE) {
+    scrollInterval = setInterval(() => window.scrollBy(0, -SCROLL_SPEED), 16);
+  } else if (clientY > vh - SCROLL_ZONE) {
+    scrollInterval = setInterval(() => window.scrollBy(0, SCROLL_SPEED), 16);
+  }
+}
+function stopAutoScroll() {
+  if (scrollInterval) { clearInterval(scrollInterval); scrollInterval = null; }
+}
+
+function onTouchStart(e) {
+  const card = e.currentTarget;
+  if (card.classList.contains('placed-correct')) return;
+  // Wrong cards are returned on click (tap), not re-dragged from touch-start
+  if (card.classList.contains('placed-wrong')) return;
+  touchDragEl = card;
+  touchDragData = CARDS.find(d => d.text === card.dataset.text);
+  ghost.textContent = card.textContent;
+  ghost.style.display = 'block';
+  positionGhost(e.touches[0]);
+  e.preventDefault();
+}
+
+function onTouchMove(e) {
+  if (!touchDragEl) return;
+  positionGhost(e.touches[0]);
+  startAutoScroll(e.touches[0].clientY);
+  e.preventDefault();
+  // Highlight zone under finger
+  document.querySelectorAll('.zone').forEach(z => z.classList.remove('drag-over'));
+  const el = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY);
+  const zone = el && el.closest('.zone');
+  if (zone) zone.classList.add('drag-over');
+}
+
+function onTouchEnd(e) {
+  if (!touchDragEl) return;
+  ghost.style.display = 'none';
+  stopAutoScroll();
+  document.querySelectorAll('.zone').forEach(z => z.classList.remove('drag-over'));
+  const t = e.changedTouches[0];
+  const el = document.elementFromPoint(t.clientX, t.clientY);
+  const zone = el && el.closest('.zone');
+  if (zone) {
+    dragCard = { el: touchDragEl, data: touchDragData };
+    handleDrop(zone.dataset.cat);
+  }
+  touchDragEl = null;
+  touchDragData = null;
+  e.preventDefault();
+}
+
+function positionGhost(touch) {
+  ghost.style.left = (touch.clientX + 14) + 'px';
+  ghost.style.top  = (touch.clientY + 14) + 'px';
+}
+
+// ── Reveal All ──
+document.getElementById('btn-reveal').addEventListener('click', () => {
+  document.querySelectorAll('.card:not(.placed-correct):not(.placed-wrong)').forEach(card => {
+    const data = CARDS.find(d => d.text === card.dataset.text);
+    if (!data) return;
+    dragCard = { el: card, data };
+    handleDrop(data.cat);
+  });
+});
+
+// ── Reset ──
+document.getElementById('btn-reset').addEventListener('click', build);
+
+// ── Init ──
+build();
+</script>
+</body>
+</html>

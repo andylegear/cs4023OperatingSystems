@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CS4023 Operating Systems — Public Resources</title>
+<style>
+  :root {
+    --ul-blue: #003865;
+    --ul-teal: #007A8A;
+    --ul-gold: #F2A900;
+    --bg: #f8f9fa;
+    --border: #dee2e6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: var(--bg); color: #212529; }
+
+  header {
+    background: var(--ul-blue);
+    color: #fff;
+    padding: 1.5rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+  }
+  header h1 { font-size: 1.6rem; font-weight: 700; }
+  header p  { font-size: .9rem; opacity: .8; }
+
+  .notice {
+    background: #fff3cd;
+    border-left: 4px solid var(--ul-gold);
+    padding: .75rem 1.5rem;
+    font-size: .85rem;
+    color: #664d03;
+  }
+
+  main { padding: 1.5rem 2rem; overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    font-size: .88rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  thead th {
+    background: var(--ul-teal);
+    color: #fff;
+    padding: .7rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  tbody tr { border-bottom: 1px solid var(--border); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: #f1f8ff; }
+  tbody tr.empty { color: #adb5bd; }
+  td { padding: .65rem 1rem; vertical-align: top; }
+  td.week-label { font-weight: 600; white-space: nowrap; color: var(--ul-blue); width: 22%; }
+  td.coming-soon { font-style: italic; font-size: .82rem; }
+
+  td a {
+    display: block;
+    color: var(--ul-teal);
+    text-decoration: none;
+    margin-bottom: .2rem;
+    word-break: break-word;
+  }
+  td a:hover { text-decoration: underline; }
+  .none { color: #adb5bd; }
+
+  footer {
+    text-align: center;
+    font-size: .78rem;
+    color: #6c757d;
+    padding: 1.5rem;
+    border-top: 1px solid var(--border);
+    margin-top: 1rem;
+  }
+
+  @media (max-width: 700px) {
+    main { padding: .75rem; }
+    table, thead, tbody, th, td, tr { display: block; }
+    thead { display: none; }
+    tbody tr { margin-bottom: 1rem; border: 1px solid var(--border); border-radius: 6px; }
+    td { border: none; padding: .5rem .75rem; }
+    td.week-label { background: var(--ul-blue); color: #fff; border-radius: 5px 5px 0 0; }
+    td::before { content: attr(data-label); font-weight: 600; display: block; font-size: .75rem; color: #6c757d; margin-bottom: .2rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>CS4023 Operating Systems</h1>
+  <p>University of Limerick &nbsp;·&nbsp; Academic Year 2025–26 &nbsp;·&nbsp; Public Resources</p>
+</header>
+
+<div class="notice">
+  📚 These are publicly shared teaching resources for enrolled CS4023 students.
+  Lecture slides, tutorial sheets and lab instructions are provided for study purposes.
+  Active learning tools open directly in your browser — no login required.
+</div>
+
+<main>
+  <table>
+    <thead>
+      <tr>
+        <th>Week</th>
+        <th>Slides (PPTX)</th>
+        <th>Live Slides</th>
+        <th>Active Learning Tools</th>
+        <th>Tutorial Sheet</th>
+        <th>Lab Instructions</th>
+      </tr>
+    </thead>
+    <tbody>
+    <tr>
+      <td class="week-label">Week 1 — Introduction &amp; OS Overview</td>
+      <td class="cell-lectures">
+          <a href='lectures/Week_01_Introduction_and_OS_Overview/L01_1_Module_Overview_and_Administration.pptx' download>L01_1_Module_Overview_and_Administration.pptx</a>
+          <a href='lectures/Week_01_Introduction_and_OS_Overview/L01_2_Introduction_History_and_Types_of_OS.pptx' download>L01_2_Introduction_History_and_Types_of_OS.pptx</a>
+      </td>
+      <td class="cell-slides">
+          <a href='slides/Week_01_Introduction_and_OS_Overview/L01_1_html/' target='_blank'>L01_1</a>
+          <a href='slides/Week_01_Introduction_and_OS_Overview/L01_2_html/' target='_blank'>L01_2</a>
+      </td>
+      <td class="cell-tools">
+          <a href='tools/Week_01_Introduction_and_OS_Overview/Tool_1_1/' target='_blank'>Tool_1_1</a>
+          <a href='tools/Week_01_Introduction_and_OS_Overview/Tool_1_2/' target='_blank'>Tool_1_2</a>
+      </td>
+      <td class="cell-tutorials">
+          <a href='tutorials/Week_01_Introduction_and_OS_Overview/Tutorial_01_Questions.docx' download>Tutorial_01_Questions.docx</a>
+      </td>
+      <td class="cell-labs">
+          <a href='labs/Week_01_Introduction_and_OS_Overview/Lab_01_Instructions.docx' download>Lab_01_Instructions.docx</a>
+      </td>
+    </tr>    <tr class="empty">
+      <td class="week-label">Week 2 — Computer Organisation &amp; OS Structure</td>
+      <td colspan="5" class="coming-soon">Coming soon</td>
+    </tr>    <tr class="empty">
+      <td class="week-label">Week 3 — Processes</td>
+      <td colspan="5" class="coming-soon">Coming soon</td>
+    </tr>    <tr class="empty">
+      <td class="week-label">Week 4 — Threads</td>
+      <td colspan="5" class="coming-soon">Coming soon</td>
+    </tr>    <tr class="empty">
+      <td class="week-label">Week 5 — Interprocess Communication</td>
+      <td colspan="5" class="coming-soon">Coming soon</td>
+    </tr>    <tr class="empty">
+      <td class="week-label">Week 6 — CPU Scheduling</td>
+      <td colspan="5" class="coming-soon">Coming soon</td>
+    </tr>    <tr class="empty">
+      <td class="week-label">Week 7 — Midterm &amp; Synchronisation</td>
+      <td colspan="5" class="coming-soon">Coming soon</td>
+    </tr>    <tr class="empty">
+      <td class="week-label">Week 8 — Concurrency &amp; Monitors</td>
+      <td colspan="5" class="coming-soon">Coming soon</td>
+    </tr>    <tr class="empty">
+      <td class="week-label">Week 9 — Deadlocks &amp; Memory Allocation</td>
+      <td colspan="5" class="coming-soon">Coming soon</td>
+    </tr>    <tr class="empty">
+      <td class="week-label">Week 10 — Paging &amp; Virtual Memory</td>
+      <td colspan="5" class="coming-soon">Coming soon</td>
+    </tr>    <tr class="empty">
+      <td class="week-label">Week 11 — Page Replacement &amp; File Systems</td>
+      <td colspan="5" class="coming-soon">Coming soon</td>
+    </tr>    <tr class="empty">
+      <td class="week-label">Week 12 — I/O Systems &amp; Virtualisation</td>
+      <td colspan="5" class="coming-soon">Coming soon</td>
+    </tr>    <tr class="empty">
+      <td class="week-label">Week 13 — Cloud, AI &amp; Operating Systems</td>
+      <td colspan="5" class="coming-soon">Coming soon</td>
+    </tr>
+    </tbody>
+  </table>
+</main>
+
+<footer>
+  Built 25 June 2026 &nbsp;·&nbsp; CS4023 Operating Systems &nbsp;·&nbsp; University of Limerick
+</footer>
+
+</body>
+</html>

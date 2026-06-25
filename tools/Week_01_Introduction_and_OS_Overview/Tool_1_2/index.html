@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OS Timeline Explorer — CS4023</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy: #003366; --green: #005335;
+    --era1: #8e44ad; --era2: #1a6fa8; --era3: #16a085; --era4: #d35400; --era5: #c0392b;
+    --correct: #1a7a3e; --wrong: #c0392b;
+    --bg: #f4f6f9; --border: #d0d7e2; --radius: 8px;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: var(--bg); color: #222; min-height: 100vh; }
+
+  header { background: var(--navy); color: #fff; padding: 14px 20px;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; z-index: 200; }
+  header h1 { font-size: clamp(.95rem, 3vw, 1.25rem); }
+  #challenge-score { background: rgba(255,255,255,.15); border-radius: 20px;
+    padding: 5px 14px; font-size: .95rem; font-weight: bold; white-space: nowrap; }
+
+  #instructions { background: #e8edf5; border-left: 4px solid var(--navy);
+    padding: 10px 16px; margin: 12px 16px 4px; border-radius: 4px; font-size: .85rem; }
+
+  /* ── LEGEND ── */
+  #legend { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 16px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: .78rem; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── TIMELINE SCROLL ── */
+  #timeline-wrapper { overflow-x: auto; padding: 0 16px 6px; }
+  #timeline-outer { position: relative; height: 180px; min-width: 900px; margin: 8px 0; }
+
+  /* axis */
+  #timeline-axis { position: absolute; top: 90px; left: 0; right: 0; height: 4px;
+    background: var(--navy); border-radius: 2px; }
+
+  /* decade labels + gridlines */
+  .decade-label { position: absolute; top: 100px; font-size: .72rem; color: #666;
+    transform: translateX(-50%); }
+  .decade-line  { position: absolute; top: 20px; bottom: 20px; width: 1px;
+    background: #ccd5e0; }
+
+  /* milestone dot */
+  .milestone {
+    position: absolute; width: 14px; height: 14px; border-radius: 50%;
+    top: 83px; transform: translateX(-50%);
+    cursor: pointer; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.3);
+    transition: transform .15s;
+    z-index: 10;
+  }
+  .milestone:hover, .milestone.active { transform: translateX(-50%) scale(1.5); z-index: 20; }
+  .milestone-label {
+    position: absolute; font-size: .68rem; white-space: nowrap;
+    transform: translateX(-50%); pointer-events: none;
+    max-width: 80px; text-align: center; line-height: 1.2;
+  }
+
+  /* ── INFO CARD ── */
+  #info-card {
+    background: #fff; border: 2px solid var(--navy); border-radius: var(--radius);
+    margin: 0 16px 12px; padding: 14px 16px; display: none;
+    position: relative;
+  }
+  #info-card h3 { color: var(--navy); font-size: 1rem; }
+  #info-card .year-badge { display: inline-block; background: var(--navy); color: #fff;
+    border-radius: 12px; padding: 2px 10px; font-size: .8rem; margin-left: 8px; }
+  #info-card .problem { color: #444; font-size: .88rem; margin-top: 6px; }
+  #info-card .problem strong { color: var(--wrong); }
+  #info-card .modern  { color: #155724; background: #d4edda; border-radius: 4px;
+    padding: 6px 10px; margin-top: 8px; font-size: .85rem; }
+  #info-card .close-btn { position: absolute; top: 10px; right: 12px; background: none;
+    border: none; font-size: 1.2rem; cursor: pointer; color: #666; }
+
+  /* ── DROP ZONES (on timeline) ── */
+  .drop-zone-decade {
+    position: absolute; top: 20px; bottom: 20px;
+    border: 2px dashed transparent; border-radius: 6px;
+    transition: border-color .2s, background .2s;
+  }
+  .drop-zone-decade.drag-over { border-color: var(--navy); background: rgba(0,51,102,.07); }
+
+  /* ── CHALLENGE SIDEBAR / BELOW ── */
+  #challenge-section {
+    background: #fff; border: 2px solid var(--border); border-radius: var(--radius);
+    margin: 0 16px 16px; padding: 14px 16px;
+  }
+  #challenge-section h2 { font-size: .95rem; color: var(--navy); margin-bottom: 4px; }
+  #challenge-section p  { font-size: .82rem; color: #555; margin-bottom: 10px; }
+
+  #innovation-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .innovation-tag {
+    background: var(--navy); color: #fff; border-radius: 20px;
+    padding: 6px 13px; font-size: .82rem; cursor: grab; user-select: none;
+    touch-action: none; transition: opacity .15s;
+    white-space: nowrap;
+  }
+  .innovation-tag.dragging { opacity: .5; }
+  .innovation-tag.correct  { background: var(--correct); cursor: default; }
+  .innovation-tag.wrong    { background: var(--wrong);   cursor: pointer; }
+
+  #decade-zones { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+  .decade-zone {
+    border: 2px dashed var(--border); border-radius: var(--radius);
+    padding: 8px; min-height: 70px; transition: border-color .2s, background .2s;
+  }
+  .decade-zone.drag-over { border-color: var(--navy); background: #eaf0f8; }
+  .decade-zone h4 { font-size: .8rem; color: var(--navy); margin-bottom: 6px; }
+  .decade-zone .placed-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .placed-tag { font-size: .75rem; border-radius: 12px; padding: 3px 8px; color: #fff; }
+  .placed-tag.pending  { background: #6c757d; cursor: pointer; }
+  .placed-tag.pending:hover { background: #545b62; }
+  .placed-tag.correct { background: var(--correct); cursor: default; }
+  .placed-tag.wrong   { background: var(--wrong);   cursor: pointer; }
+  .placed-tag.wrong:hover { opacity: .85; }
+
+  #challenge-controls { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  button { padding: 9px 20px; border: none; border-radius: 6px; cursor: pointer;
+    font-size: .88rem; font-weight: 600; transition: opacity .15s; }
+  button:hover { opacity: .85; }
+  .btn-navy  { background: var(--navy);  color: #fff; }
+  .btn-green { background: var(--green); color: #fff; }
+
+  /* mobile ghost */
+  #drag-ghost { position: fixed; pointer-events: none; z-index: 9999;
+    background: var(--navy); color: #fff; border-radius: 20px; padding: 7px 14px;
+    font-size: .82rem; display: none; white-space: nowrap; }
+
+  @media (max-width: 600px) {
+    #timeline-outer { height: 160px; }
+    .milestone { width: 12px; height: 12px; }
+    .milestone-label { font-size: .62rem; }
+    #decade-zones { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📅 OS Timeline Explorer — CS4023</h1>
+  <div id="challenge-score">Challenge: <span id="ch-score">0</span> / 10</div>
+</header>
+
+<div id="instructions">
+  <strong>Part 1 – Explore:</strong> Click any dot on the timeline to learn about that OS milestone.<br>
+  <strong>Part 2 – Challenge:</strong> Drag the innovation tags below onto the correct decade zone, then click <em>Check Answers</em>.
+  On mobile, press-and-hold a tag then drag it.
+</div>
+
+<div id="legend"></div>
+
+<div id="timeline-wrapper">
+  <div id="timeline-outer">
+    <div id="timeline-axis"></div>
+  </div>
+</div>
+
+<div id="info-card">
+  <button class="close-btn" onclick="document.getElementById('info-card').style.display='none'">✕</button>
+  <h3 id="ic-name"></h3><span class="year-badge" id="ic-year"></span>
+  <p class="problem"><strong>Problem solved:</strong> <span id="ic-problem"></span></p>
+  <p class="modern" id="ic-modern"></p>
+</div>
+
+<div id="challenge-section">
+  <h2>🎯 Place the Innovation</h2>
+  <p>Drag each innovation to the decade it was introduced. Then click <strong>Check Answers</strong>.</p>
+  <div id="innovation-tags"></div>
+  <div id="decade-zones"></div>
+  <div id="challenge-controls">
+    <button class="btn-navy" onclick="checkAnswers()">✓ Check Answers</button>
+    <button class="btn-green" onclick="resetChallenge()">↺ Reset Challenge</button>
+  </div>
+</div>
+
+<div id="drag-ghost"></div>
+
+<script>
+// ── Data ──
+const ERAS = [
+  { label: 'Mainframe era',    color: '#8e44ad', years: [1952, 1968] },
+  { label: 'Unix / Personal',  color: '#1a6fa8', years: [1969, 1989] },
+  { label: '1990s',            color: '#16a085', years: [1990, 1999] },
+  { label: '2000s',            color: '#d35400', years: [2000, 2009] },
+  { label: '2010s–present',    color: '#c0392b', years: [2010, 2025] },
+];
+
+const MILESTONES = [
+  { year: 1952, name: 'GM-NAA I/O',         problem: 'No standard way to control hardware; operators loaded programs manually.',        modern: '💡 Established the concept of an OS as a hardware abstraction layer.' },
+  { year: 1961, name: 'CTSS (MIT)',          problem: 'Batch systems wasted CPU when waiting for I/O; only one user at a time.',          modern: '💡 Time-sharing became the foundation of every interactive OS in use today.' },
+  { year: 1969, name: 'Unix (Bell Labs)',    problem: 'Operating systems were machine-specific and non-portable.',                        modern: '💡 Unix philosophy and POSIX APIs underpin every Linux/macOS/Android system.' },
+  { year: 1974, name: 'CP/M',               problem: 'Microcomputers had no standard OS; each machine required custom software.',         modern: '💡 First step toward commodity personal computing and the OS market.' },
+  { year: 1981, name: 'MS-DOS',             problem: 'IBM PC needed a simple, inexpensive OS for the mass market.',                      modern: '💡 Popularised command-line interfaces; its FAT filesystem is still used on USB drives.' },
+  { year: 1984, name: 'Mac OS 1.0',         problem: 'Command-line interfaces were inaccessible to non-technical users.',                modern: '💡 Established the WIMP GUI paradigm adopted by all desktop OSes.' },
+  { year: 1991, name: 'Linux 0.01',         problem: 'No free, portable, Unix-like kernel for personal computers.',                      modern: '💡 Powers >90% of servers, all Android devices, and most cloud infrastructure.' },
+  { year: 1993, name: 'Windows NT 3.1',     problem: 'Consumer Windows lacked memory protection and true 32-bit operation.',             modern: '💡 NT kernel is still the foundation of every modern Windows version.' },
+  { year: 2000, name: 'Mac OS X / XNU',     problem: 'Classic Mac OS had no memory protection or preemptive multitasking.',              modern: '💡 XNU hybrid kernel design influenced subsequent OS microkernel research.' },
+  { year: 2007, name: 'iOS / Android',      problem: 'Mobile devices needed power-efficient, touch-first operating systems.',            modern: '💡 Mobile OSes now run on more devices than desktop OSes combined.' },
+  { year: 2008, name: 'KVM in Linux',       problem: 'Type-1 virtualisation required separate hypervisor OS installations.',             modern: '💡 KVM is the foundation of AWS, Google Cloud, and Azure VM infrastructure.' },
+  { year: 2013, name: 'Docker 1.0',         problem: 'VMs were too heavyweight for rapid application deployment.',                       modern: '💡 Containers changed software delivery; now the dominant deployment unit in cloud.' },
+  { year: 2014, name: 'Kubernetes',         problem: 'Containers needed orchestration at scale across many machines.',                   modern: '💡 Kubernetes is the de facto OS for distributed cloud-native applications.' },
+  { year: 2022, name: 'eBPF mainstream',    problem: 'Kernel changes were slow and risky; no safe way to extend the kernel at runtime.', modern: '💡 eBPF enables safe kernel-level observability, networking, and security tools.' },
+];
+
+const CHALLENGE = [
+  { tag: 'Multiprogramming',        decade: '1960s' },
+  { tag: 'Virtual memory',          decade: '1960s' },
+  { tag: 'POSIX standard',          decade: '1980s' },
+  { tag: 'Protected mode (x86)',    decade: '1980s' },
+  { tag: 'SMP support in Linux',    decade: '1990s' },
+  { tag: '64-bit addressing (AMD64)',decade: '2000s' },
+  { tag: 'cgroups & namespaces',    decade: '2000s' },
+  { tag: 'systemd init system',     decade: '2010s' },
+  { tag: 'io_uring async I/O',      decade: '2010s' },
+  { tag: 'MicroVM / Firecracker',   decade: '2010s' },
+];
+
+const DECADES = ['1950s','1960s','1970s','1980s','1990s','2000s','2010s','2020s'];
+const START_YEAR = 1948, END_YEAR = 2026;
+const TOTAL_YEARS = END_YEAR - START_YEAR;
+
+function yearToPercent(y) { return ((y - START_YEAR) / TOTAL_YEARS) * 100; }
+
+function eraColor(year) {
+  for (const e of ERAS) if (year >= e.years[0] && year <= e.years[1]) return e.color;
+  return '#888';
+}
+
+// ── Build legend ──
+const legendEl = document.getElementById('legend');
+ERAS.forEach(e => {
+  const li = document.createElement('div'); li.className = 'legend-item';
+  li.innerHTML = `<div class="legend-dot" style="background:${e.color}"></div><span>${e.label}</span>`;
+  legendEl.appendChild(li);
+});
+
+// ── Build timeline ──
+const outer = document.getElementById('timeline-outer');
+
+// Decade gridlines + labels
+[1950,1960,1970,1980,1990,2000,2010,2020].forEach(yr => {
+  const pct = yearToPercent(yr);
+  const line = document.createElement('div');
+  line.className = 'decade-line';
+  line.style.left = pct + '%';
+  outer.appendChild(line);
+
+  const lbl = document.createElement('div');
+  lbl.className = 'decade-label';
+  lbl.style.left = pct + '%';
+  lbl.textContent = yr;
+  outer.appendChild(lbl);
+});
+
+// Milestones
+MILESTONES.forEach(m => {
+  const pct = yearToPercent(m.year);
+  const dot = document.createElement('div');
+  dot.className = 'milestone';
+  dot.style.left = pct + '%';
+  dot.style.background = eraColor(m.year);
+  dot.title = `${m.year} — ${m.name}`;
+
+  // alternate label above/below to reduce overlap
+  const above = MILESTONES.indexOf(m) % 2 === 0;
+  const lbl = document.createElement('div');
+  lbl.className = 'milestone-label';
+  lbl.style.left = pct + '%';
+  lbl.style.top = above ? '5px' : '115px';
+  lbl.style.color = eraColor(m.year);
+  lbl.textContent = `${m.year}\n${m.name}`;
+  lbl.style.whiteSpace = 'pre';
+
+  dot.addEventListener('click', () => showInfo(m, dot));
+  outer.appendChild(dot);
+  outer.appendChild(lbl);
+});
+
+function showInfo(m, dot) {
+  document.querySelectorAll('.milestone').forEach(d => d.classList.remove('active'));
+  dot.classList.add('active');
+  document.getElementById('ic-name').textContent = m.name;
+  document.getElementById('ic-year').textContent = m.year;
+  document.getElementById('ic-problem').textContent = m.problem;
+  document.getElementById('ic-modern').textContent = m.modern;
+  const card = document.getElementById('info-card');
+  card.style.display = 'block';
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ── Build challenge ──
+let challengeState = {}; // tag → placed decade
+
+function buildChallenge() {
+  challengeState = {};
+  document.getElementById('ch-score').textContent = '0';
+
+  // Tags
+  const tagsEl = document.getElementById('innovation-tags');
+  tagsEl.innerHTML = '';
+  CHALLENGE.forEach(c => {
+    const tag = document.createElement('div');
+    tag.className = 'innovation-tag';
+    tag.textContent = c.tag;
+    tag.dataset.tag = c.tag;
+    tag.draggable = true;
+    tag.addEventListener('dragstart', e => {
+      dragTag = { el: tag, data: c };
+      tag.classList.add('dragging');
+    });
+    tag.addEventListener('dragend', () => tag.classList.remove('dragging'));
+    tag.addEventListener('touchstart', onTagTouchStart, { passive: false });
+    tag.addEventListener('touchmove',  onTagTouchMove,  { passive: false });
+    tag.addEventListener('touchend',   onTagTouchEnd,   { passive: false });
+    tagsEl.appendChild(tag);
+  });
+
+  // Decade zones
+  const zonesEl = document.getElementById('decade-zones');
+  zonesEl.innerHTML = '';
+  DECADES.forEach(dec => {
+    const zone = document.createElement('div');
+    zone.className = 'decade-zone';
+    zone.dataset.decade = dec;
+    zone.innerHTML = `<h4>${dec}</h4><div class="placed-tags" data-dec="${dec}"></div>`;
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); placeTag(dec); });
+    zonesEl.appendChild(zone);
+  });
+}
+
+let dragTag = null;
+
+function placeTag(decade) {
+  if (!dragTag) return;
+  const { el, data } = dragTag;
+  dragTag = null;
+
+  // Remove from previous zone if re-placed
+  const prev = document.querySelector(`.placed-tag[data-tag="${data.tag}"]`);
+  if (prev) prev.remove();
+
+  challengeState[data.tag] = decade;
+
+  // Visual: move to zone
+  const container = document.querySelector(`[data-dec="${decade}"]`);
+  const chip = document.createElement('span');
+  chip.className = 'placed-tag pending';
+  chip.dataset.tag = data.tag;
+  chip.textContent = data.tag;
+  chip.title = 'Tap/click to move back';
+  container.appendChild(chip);
+
+  // Click to return to pool (unless locked correct after checking)
+  chip.addEventListener('click', () => returnChipToPool(chip, data));
+
+  // Hide original tag
+  el.style.display = 'none';
+}
+
+function returnChipToPool(chip, data) {
+  if (chip.classList.contains('correct')) return; // locked
+  chip.remove();
+  delete challengeState[data.tag];
+  // Show original tag again
+  const origTag = document.querySelector(`.innovation-tag[data-tag="${data.tag}"]`);
+  if (origTag) { origTag.style.display = ''; origTag.classList.remove('correct','wrong'); }
+}
+
+function checkAnswers() {
+  let correct = 0;
+  CHALLENGE.forEach(c => {
+    const chip = document.querySelector(`.placed-tag[data-tag="${c.tag}"]`);
+    if (!chip) return;
+    const placed = challengeState[c.tag];
+    if (placed === c.decade) {
+      chip.classList.remove('pending'); chip.classList.add('correct');
+      correct++;
+    } else {
+      chip.classList.remove('pending'); chip.classList.add('wrong');
+      chip.title = `Correct: ${c.decade} — tap to try again`;
+    }
+  });
+  document.getElementById('ch-score').textContent = correct;
+}
+
+function resetChallenge() {
+  buildChallenge();
+}
+
+// ── Touch for tags ──
+let touchTag = null;
+let touchTagData = null;
+let scrollInterval = null;
+const ghost = document.getElementById('drag-ghost');
+const SCROLL_ZONE = 80;
+const SCROLL_SPEED = 8;
+
+function startAutoScroll(clientY) {
+  stopAutoScroll();
+  const vh = window.innerHeight;
+  if (clientY < SCROLL_ZONE) {
+    scrollInterval = setInterval(() => window.scrollBy(0, -SCROLL_SPEED), 16);
+  } else if (clientY > vh - SCROLL_ZONE) {
+    scrollInterval = setInterval(() => window.scrollBy(0, SCROLL_SPEED), 16);
+  }
+}
+function stopAutoScroll() {
+  if (scrollInterval) { clearInterval(scrollInterval); scrollInterval = null; }
+}
+
+function onTagTouchStart(e) {
+  const tag = e.currentTarget;
+  touchTag = tag;
+  touchTagData = CHALLENGE.find(c => c.tag === tag.dataset.tag);
+  ghost.textContent = tag.textContent;
+  ghost.style.display = 'block';
+  positionGhost(e.touches[0]);
+  e.preventDefault();
+}
+function onTagTouchMove(e) {
+  if (!touchTag) return;
+  positionGhost(e.touches[0]);
+  startAutoScroll(e.touches[0].clientY);
+  document.querySelectorAll('.decade-zone').forEach(z => z.classList.remove('drag-over'));
+  const el = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY);
+  const zone = el && el.closest('.decade-zone');
+  if (zone) zone.classList.add('drag-over');
+  e.preventDefault();
+}
+function onTagTouchEnd(e) {
+  if (!touchTag) return;
+  ghost.style.display = 'none';
+  stopAutoScroll();
+  document.querySelectorAll('.decade-zone').forEach(z => z.classList.remove('drag-over'));
+  const t = e.changedTouches[0];
+  const el = document.elementFromPoint(t.clientX, t.clientY);
+  const zone = el && el.closest('.decade-zone');
+  if (zone) {
+    dragTag = { el: touchTag, data: touchTagData };
+    placeTag(zone.dataset.decade);
+  }
+  touchTag = null;
+  touchTagData = null;
+  e.preventDefault();
+}
+function positionGhost(touch) {
+  ghost.style.left = (touch.clientX + 14) + 'px';
+  ghost.style.top  = (touch.clientY + 14) + 'px';
+}
+
+// ── Init ──
+buildChallenge();
+</script>
+</body>
+</html>
