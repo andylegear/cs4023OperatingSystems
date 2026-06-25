@@ -80,6 +80,20 @@
     margin-top: 1rem;
   }
 
+  .tools-bar {
+    background: #e8f4f8;
+    border-left: 4px solid var(--ul-teal);
+    padding: .75rem 1.5rem;
+    font-size: .88rem;
+    margin-top: 1rem;
+  }
+  .tools-bar a {
+    color: var(--ul-teal);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .tools-bar a:hover { text-decoration: underline; }
+
   @media (max-width: 700px) {
     main { padding: .75rem; }
     table, thead, tbody, th, td, tr { display: block; }
@@ -177,6 +191,12 @@
     </tbody>
   </table>
 </main>
+
+<div class="tools-bar">
+  <strong>Programming Projects:</strong>
+  <a href="projects/submission_checker.html" target="_blank">📋 Submission Checker</a>
+  &nbsp;— drag your ZIP in to validate structure before submitting to Brightspace.
+</div>
 
 <footer>
   Built 25 June 2026 &nbsp;·&nbsp; CS4023 Operating Systems &nbsp;·&nbsp; University of Limerick
