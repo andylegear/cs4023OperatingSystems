@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CS4023 – Tool 2.2 System Call Flow Animator</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 18px;
+  }
+
+  h1 { font-size: 1.25rem; color: #a0c4ff; text-align: center; margin-bottom: 2px; }
+  .subtitle { font-size: 0.82rem; color: #888; text-align: center; margin-bottom: 14px; }
+
+  /* ── Toolbar ── */
+  .toolbar {
+    display: flex; gap: 12px; align-items: center;
+    flex-wrap: wrap; justify-content: center;
+    margin-bottom: 14px;
+  }
+  label { font-size: 0.85rem; color: #a0c4ff; }
+  select {
+    background: #1e2a45; color: #e0e0e0; border: 1.5px solid #4a6fa5;
+    border-radius: 6px; padding: 6px 10px; font-size: 0.85rem;
+  }
+  button {
+    background: #1e2a45; color: #a0c4ff; border: 1.5px solid #4a6fa5;
+    border-radius: 6px; padding: 7px 14px; cursor: pointer; font-size: 0.84rem;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  button:hover { background: #2a3a60; border-color: #a0c4ff; }
+  button.primary { background: #ffd700; color: #000; border-color: #ffd700; font-weight: 700; }
+  button.primary:hover { background: #e0c000; }
+  button:disabled { opacity: 0.4; cursor: default; }
+
+  /* ── Main layout ── */
+  .main { display: flex; gap: 18px; width: 100%; max-width: 960px; }
+
+  /* ── Flow diagram ── */
+  .flow-diagram {
+    flex: 1 1 560px;
+    display: flex;
+    gap: 0;
+    border-radius: 10px;
+    overflow: hidden;
+    min-height: 460px;
+    border: 1.5px solid #2a3a60;
+  }
+
+  .zone {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 14px 12px;
+    gap: 10px;
+    position: relative;
+  }
+  .user-zone { background: #e8f0fe; }
+  .kernel-zone { background: #0d1b2a; }
+
+  .zone-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.05em; text-align: center; padding-bottom: 6px;
+    border-bottom: 1px dashed #aaa; margin-bottom: 4px;
+  }
+  .user-zone .zone-label { color: #1a237e; }
+  .kernel-zone .zone-label { color: #90caf9; }
+
+  .boundary {
+    width: 4px;
+    background: repeating-linear-gradient(to bottom, #ffd700 0px, #ffd700 8px, transparent 8px, transparent 16px);
+    position: relative;
+    flex-shrink: 0;
+  }
+  .boundary-label {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) rotate(-90deg);
+    white-space: nowrap;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #ffd700;
+    background: #1a1a2e;
+    padding: 2px 6px;
+    letter-spacing: 0.08em;
+  }
+
+  /* Component boxes */
+  .comp-box {
+    background: #c8d8f8;
+    border: 2px solid #5c78c0;
+    border-radius: 7px;
+    padding: 8px 10px;
+    font-size: 0.8rem;
+    color: #0d1b4a;
+    text-align: center;
+    transition: border-color 0.3s, box-shadow 0.3s, background 0.3s;
+    cursor: default;
+  }
+  .comp-box .name { font-weight: 700; font-size: 0.82rem; }
+  .comp-box .detail { font-family: 'Consolas', monospace; font-size: 0.73rem; color: #3050a0; margin-top: 2px; }
+
+  .kernel-zone .comp-box {
+    background: #112244;
+    border-color: #3a5a9a;
+    color: #c8d8f8;
+  }
+  .kernel-zone .comp-box .detail { color: #7ecfff; }
+
+  .comp-box.active {
+    border-color: #ffd700 !important;
+    box-shadow: 0 0 12px #ffd70099;
+    background: #2a2a00 !important;
+    color: #ffd700 !important;
+  }
+  .comp-box.active .detail { color: #ffe066 !important; }
+
+  /* Arrow indicator */
+  .arrow-row {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; height: 18px;
+  }
+  .arrow-row .arr { color: #5c78c0; transition: color 0.3s; }
+  .arrow-row .arr.active { color: #ffd700; }
+
+  /* ── Right panel ── */
+  .side-panel {
+    flex: 0 0 260px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+
+  .step-counter {
+    background: #12122a; border-radius: 8px; padding: 12px; text-align: center;
+  }
+  .step-counter .num { font-size: 2rem; font-weight: 700; color: #ffd700; }
+  .step-counter .of  { font-size: 0.85rem; color: #888; }
+
+  .bubble {
+    background: #12122a; border-radius: 8px;
+    border-left: 4px solid #ffd700;
+    padding: 12px; font-size: 0.86rem; line-height: 1.55;
+    flex: 1; min-height: 120px;
+  }
+  .bubble.idle { border-left-color: #4a6fa5; color: #888; font-style: italic; }
+  .bubble code { font-family: 'Consolas', monospace; background: #222; padding: 1px 4px; border-radius: 3px; font-size: 0.82em; }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+
+  /* ── Quiz ── */
+  .quiz-section {
+    width: 100%; max-width: 960px; margin-top: 18px;
+    background: #12122a; border-radius: 10px; padding: 20px; display: none;
+  }
+  .quiz-section h2 { color: #a0c4ff; margin-bottom: 8px; font-size: 1rem; }
+  .quiz-section p.hint { font-size: 0.82rem; color: #888; margin-bottom: 14px; }
+
+  /* Drag-and-drop ordering quiz */
+  .drag-container {
+    display: flex; gap: 18px; flex-wrap: wrap;
+  }
+  .drag-pool, .drop-zone {
+    flex: 1 1 200px;
+    background: #1e2a45; border-radius: 8px; padding: 12px;
+    min-height: 160px;
+  }
+  .drag-pool h3, .drop-zone h3 {
+    font-size: 0.78rem; color: #a0c4ff; margin-bottom: 10px; text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .drag-item {
+    background: #2a3a60; border: 1.5px solid #4a6fa5; border-radius: 6px;
+    padding: 8px 10px; margin-bottom: 8px; font-size: 0.82rem; cursor: grab;
+    user-select: none; transition: opacity 0.2s;
+  }
+  .drag-item:active { cursor: grabbing; opacity: 0.7; }
+  .drag-item.correct-pos { border-color: #4caf50; background: #1a3020; }
+  .drag-item.wrong-pos   { border-color: #e53935; background: #2a1010; }
+
+  .drop-slot {
+    min-height: 42px; border: 1.5px dashed #4a6fa5; border-radius: 6px;
+    margin-bottom: 8px; padding: 2px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; color: #666;
+  }
+  .drop-slot.drag-over { border-color: #ffd700; background: #2a2a00; }
+
+  .quiz-footer { display: flex; gap: 12px; align-items: center; margin-top: 14px; }
+  #quiz-score { font-size: 1.05rem; font-weight: 600; color: #ffd700; }
+</style>
+</head>
+<body>
+
+<h1>CS4023 – Tool 2.2: System Call Flow Animator</h1>
+<p class="subtitle">Trace the journey of a system call from user space into the kernel and back.</p>
+
+<div class="toolbar">
+  <label for="syscall-select">System call:</label>
+  <select id="syscall-select" onchange="loadSyscall()">
+    <option value="write">write(fd, buf, n)</option>
+    <option value="read">read(fd, buf, n)</option>
+    <option value="fork">fork()</option>
+    <option value="open">open(path, flags)</option>
+  </select>
+  <button class="primary" id="btn-play" onclick="togglePlay()">▶ Play</button>
+  <button id="btn-prev" onclick="prevStep()" disabled>◀ Prev</button>
+  <button id="btn-next" onclick="nextStep()" disabled>Next ▶</button>
+  <button id="btn-reset" onclick="resetAnim()">↺ Reset</button>
+</div>
+
+<div class="main">
+  <!-- Flow diagram -->
+  <div class="flow-diagram">
+    <!-- User space -->
+    <div class="zone user-zone">
+      <div class="zone-label">User Space (Ring 3)</div>
+      <div class="comp-box" id="uc-program"><span class="name" id="uc-prog-name">C Program</span><div class="detail" id="uc-prog-detail">write(1, "Hello\n", 6)</div></div>
+      <div class="arrow-row"><span class="arr" id="ua1">↓</span></div>
+      <div class="comp-box" id="uc-libc"><span class="name">libc wrapper</span><div class="detail" id="uc-libc-detail">write() stub</div></div>
+      <div class="arrow-row"><span class="arr" id="ua2">↓</span></div>
+      <div class="comp-box" id="uc-reg"><span class="name">Registers</span><div class="detail" id="uc-reg-detail">RAX = 1 (SYS_write)</div></div>
+      <div class="arrow-row"><span class="arr" id="ua3">↓ syscall instruction</span></div>
+    </div>
+
+    <!-- Boundary -->
+    <div class="boundary">
+      <div class="boundary-label">User / Kernel Boundary</div>
+    </div>
+
+    <!-- Kernel space -->
+    <div class="zone kernel-zone">
+      <div class="zone-label">Kernel Space (Ring 0)</div>
+      <div class="comp-box" id="kc-entry"><span class="name">syscall entry point</span><div class="detail">arch/x86/entry/entry_64.S</div></div>
+      <div class="arrow-row"><span class="arr" id="ka1">↓</span></div>
+      <div class="comp-box" id="kc-table"><span class="name">syscall_table[]</span><div class="detail" id="kc-table-detail">table[1] → sys_write</div></div>
+      <div class="arrow-row"><span class="arr" id="ka2">↓</span></div>
+      <div class="comp-box" id="kc-handler"><span class="name" id="kc-handler-name">sys_write()</span><div class="detail" id="kc-handler-detail">validate fd, find file struct</div></div>
+      <div class="arrow-row"><span class="arr" id="ka3">↓</span></div>
+      <div class="comp-box" id="kc-vfs"><span class="name" id="kc-vfs-name">VFS layer</span><div class="detail" id="kc-vfs-detail">vfs_write()</div></div>
+      <div class="arrow-row"><span class="arr" id="ka4">↓</span></div>
+      <div class="comp-box" id="kc-fs"><span class="name" id="kc-fs-name">File System Driver</span><div class="detail" id="kc-fs-detail">copy to page cache</div></div>
+    </div>
+  </div>
+
+  <!-- Side panel -->
+  <div class="side-panel">
+    <div class="step-counter">
+      <div class="num" id="step-num">—</div>
+      <div class="of" id="step-of">Select a syscall and press Play</div>
+    </div>
+    <div class="bubble idle" id="bubble">Choose a system call and press ▶ Play to begin.</div>
+    <div class="controls">
+      <button id="btn-quiz" onclick="showQuiz()" disabled>📝 Take Quiz</button>
+    </div>
+  </div>
+</div>
+
+<!-- Quiz -->
+<div class="quiz-section" id="quiz">
+  <h2>Quiz — Put the Steps in Order</h2>
+  <p class="hint">Drag the 4 steps from the pool on the left into the correct order (1 → 4) in the slots on the right.</p>
+  <div class="drag-container">
+    <div class="drag-pool">
+      <h3>Steps (drag from here)</h3>
+      <div id="pool"></div>
+    </div>
+    <div class="drop-zone">
+      <h3>Correct order (drop here)</h3>
+      <div id="slot1" class="drop-slot" data-pos="1">1</div>
+      <div id="slot2" class="drop-slot" data-pos="2">2</div>
+      <div id="slot3" class="drop-slot" data-pos="3">3</div>
+      <div id="slot4" class="drop-slot" data-pos="4">4</div>
+    </div>
+  </div>
+  <div class="quiz-footer">
+    <button class="primary" onclick="checkOrder()">Check</button>
+    <button onclick="resetQuiz()">Reset</button>
+    <span id="quiz-score"></span>
+  </div>
+</div>
+
+<script>
+/* ── Step data ── */
+const FLOWS = {
+  write: {
+    progName: 'C Program', progDetail: 'write(1, "Hello\\n", 6)',
+    libcDetail: 'write() wrapper', regDetail: 'RAX=1, RDI=1, RSI=buf, RDX=6',
+    tableDetail: 'table[1] → sys_write', handlerName: 'sys_write()',
+    handlerDetail: 'validate fd, find file struct', vfsName: 'VFS layer',
+    vfsDetail: 'vfs_write()', fsName: 'File System Driver', fsDetail: 'copy to page cache',
+    steps: [
+      { active: 'uc-program', arrows: [],
+        text: 'The user program calls <code>write(1, "Hello\\n", 6)</code>. Arguments: fd=1 (stdout), buffer pointer, byte count 6.' },
+      { active: 'uc-libc', arrows: ['ua1'],
+        text: 'The call lands in the libc <code>write()</code> wrapper. libc prepares the arguments in the correct registers for the kernel ABI.' },
+      { active: 'uc-reg', arrows: ['ua1','ua2'],
+        text: 'libc loads the syscall number for <code>write</code> (SYS_write = 1 on x86-64) into register RAX. Arguments go into RDI, RSI, RDX.' },
+      { active: 'kc-entry', arrows: ['ua1','ua2','ua3'],
+        text: 'The <code>syscall</code> instruction fires. The CPU atomically switches to Ring 0 (kernel mode) and jumps to the kernel\'s syscall entry point.' },
+      { active: 'kc-table', arrows: ['ua1','ua2','ua3','ka1'],
+        text: 'The kernel reads RAX (=1) and indexes into <code>syscall_table[]</code>. Entry 1 holds a pointer to <code>sys_write()</code>.' },
+      { active: 'kc-handler', arrows: ['ua1','ua2','ua3','ka1','ka2'],
+        text: '<code>sys_write()</code> validates the file descriptor, looks up the <code>file</code> struct in the process\'s open-file table, and checks permissions.' },
+      { active: 'kc-vfs', arrows: ['ua1','ua2','ua3','ka1','ka2','ka3'],
+        text: 'Control passes to the VFS (Virtual File System) layer via <code>vfs_write()</code>. The VFS provides a uniform interface regardless of the underlying filesystem.' },
+      { active: 'kc-fs', arrows: ['ua1','ua2','ua3','ka1','ka2','ka3','ka4'],
+        text: 'The VFS calls the filesystem driver\'s write operation. Data is copied to the page cache (and later flushed to disk by the kernel\'s write-back thread).' },
+      { active: 'uc-program', arrows: [],
+        text: 'The kernel places the return value (bytes written = 6) in RAX, executes <code>sysret</code>, and the CPU switches back to Ring 3. The libc wrapper returns 6 to the caller.' },
+    ],
+    quizSteps: [
+      { id: 'qs-a', text: 'User calls write(); libc loads RAX=1 (SYS_write)' },
+      { id: 'qs-b', text: 'syscall instruction — CPU switches to Ring 0' },
+      { id: 'qs-c', text: 'Kernel dispatches via syscall_table[1] → sys_write()' },
+      { id: 'qs-d', text: 'sysret — CPU returns to Ring 3; libc returns result' },
+    ],
+    quizOrder: ['qs-a','qs-b','qs-c','qs-d'],
+  },
+
+  read: {
+    progName: 'C Program', progDetail: 'read(fd, buf, n)',
+    libcDetail: 'read() wrapper', regDetail: 'RAX=0, RDI=fd, RSI=buf, RDX=n',
+    tableDetail: 'table[0] → sys_read', handlerName: 'sys_read()',
+    handlerDetail: 'validate fd, check buffer', vfsName: 'VFS layer',
+    vfsDetail: 'vfs_read()', fsName: 'Page Cache / Driver', fsDetail: 'copy data to user buf',
+    steps: [
+      { active: 'uc-program', arrows: [],
+        text: 'The user program calls <code>read(fd, buf, n)</code>. Arguments: file descriptor, pointer to buffer, maximum byte count.' },
+      { active: 'uc-libc', arrows: ['ua1'],
+        text: 'libc\'s <code>read()</code> wrapper arranges the arguments: fd → RDI, buf → RSI, count → RDX.' },
+      { active: 'uc-reg', arrows: ['ua1','ua2'],
+        text: 'libc loads syscall number 0 (SYS_read on x86-64) into RAX, then issues the <code>syscall</code> instruction.' },
+      { active: 'kc-entry', arrows: ['ua1','ua2','ua3'],
+        text: 'The CPU switches to Ring 0 at the kernel syscall entry point. The kernel saves the user register state.' },
+      { active: 'kc-table', arrows: ['ua1','ua2','ua3','ka1'],
+        text: 'RAX=0 indexes <code>syscall_table[0]</code>, which points to <code>sys_read()</code>.' },
+      { active: 'kc-handler', arrows: ['ua1','ua2','ua3','ka1','ka2'],
+        text: '<code>sys_read()</code> validates the fd, checks the user buffer pointer is accessible, then calls <code>vfs_read()</code>.' },
+      { active: 'kc-vfs', arrows: ['ua1','ua2','ua3','ka1','ka2','ka3'],
+        text: 'The VFS layer checks the page cache. If the data is cached, it copies immediately; otherwise it issues an I/O request and blocks the process.' },
+      { active: 'kc-fs', arrows: ['ua1','ua2','ua3','ka1','ka2','ka3','ka4'],
+        text: 'If a disk read was needed, the filesystem driver fills the page cache. Data is then copied from kernel space to the user-space buffer.' },
+      { active: 'uc-program', arrows: [],
+        text: 'The kernel places bytes read (or 0 for EOF, -1 for error) in RAX and returns to user mode. The user program receives the return value from <code>read()</code>.' },
+    ],
+    quizSteps: [
+      { id: 'qs-a', text: 'User calls read(); libc loads RAX=0 (SYS_read)' },
+      { id: 'qs-b', text: 'syscall — CPU switches to Ring 0' },
+      { id: 'qs-c', text: 'VFS checks page cache; may block for disk I/O' },
+      { id: 'qs-d', text: 'Data copied to user buffer; sysret returns bytes read' },
+    ],
+    quizOrder: ['qs-a','qs-b','qs-c','qs-d'],
+  },
+
+  fork: {
+    progName: 'C Program', progDetail: 'pid = fork()',
+    libcDetail: 'fork() wrapper', regDetail: 'RAX=57 (SYS_fork)',
+    tableDetail: 'table[57] → sys_fork', handlerName: 'do_fork() / copy_process()',
+    handlerDetail: 'clone PCB, copy page tables', vfsName: 'File Table Copy',
+    vfsDetail: 'dup open file descriptors', fsName: 'Scheduler', fsDetail: 'add child to run queue',
+    steps: [
+      { active: 'uc-program', arrows: [],
+        text: 'The user program calls <code>fork()</code>. This will create an exact copy of the calling process.' },
+      { active: 'uc-libc', arrows: ['ua1'],
+        text: 'libc\'s <code>fork()</code> wrapper prepares the call. On modern Linux this typically invokes <code>clone()</code> internally, but the semantics are the same.' },
+      { active: 'uc-reg', arrows: ['ua1','ua2'],
+        text: 'RAX is loaded with 57 (SYS_fork / SYS_clone on x86-64). The <code>syscall</code> instruction transfers control to the kernel.' },
+      { active: 'kc-entry', arrows: ['ua1','ua2','ua3'],
+        text: 'The CPU switches to kernel mode. The kernel saves the parent\'s register state so the child can be set up identically.' },
+      { active: 'kc-table', arrows: ['ua1','ua2','ua3','ka1'],
+        text: '<code>syscall_table[57]</code> dispatches to <code>sys_fork()</code>, which calls the core <code>copy_process()</code> / <code>do_fork()</code> function.' },
+      { active: 'kc-handler', arrows: ['ua1','ua2','ua3','ka1','ka2'],
+        text: '<code>copy_process()</code> allocates a new PCB (task_struct), copies the parent\'s page tables (CoW — copy-on-write), and sets the child\'s return value to 0.' },
+      { active: 'kc-vfs', arrows: ['ua1','ua2','ua3','ka1','ka2','ka3'],
+        text: 'The kernel duplicates the parent\'s open file descriptor table so both processes share the same file descriptions (with incremented reference counts).' },
+      { active: 'kc-fs', arrows: ['ua1','ua2','ua3','ka1','ka2','ka3','ka4'],
+        text: 'The new child process is added to the scheduler\'s run queue. Both parent and child are now runnable.' },
+      { active: 'uc-program', arrows: [],
+        text: '<code>fork()</code> returns <em>twice</em>: in the parent it returns the child\'s PID; in the child it returns 0. Both resume execution at the line after <code>fork()</code>.' },
+    ],
+    quizSteps: [
+      { id: 'qs-a', text: 'User calls fork(); RAX=57 (SYS_fork); syscall to Ring 0' },
+      { id: 'qs-b', text: 'copy_process(): new PCB + CoW page tables created' },
+      { id: 'qs-c', text: 'File descriptor table duplicated; child added to run queue' },
+      { id: 'qs-d', text: 'Returns twice: PID to parent, 0 to child' },
+    ],
+    quizOrder: ['qs-a','qs-b','qs-c','qs-d'],
+  },
+
+  open: {
+    progName: 'C Program', progDetail: 'fd = open(path, O_RDONLY)',
+    libcDetail: 'open() wrapper', regDetail: 'RAX=2 (SYS_open)',
+    tableDetail: 'table[2] → sys_open', handlerName: 'do_sys_open()',
+    handlerDetail: 'resolve path, check permissions', vfsName: 'VFS / dcache',
+    vfsDetail: 'lookup inode via dentry cache', fsName: 'File System Driver', fsDetail: 'read inode from disk if miss',
+    steps: [
+      { active: 'uc-program', arrows: [],
+        text: 'The user program calls <code>open("/etc/hostname", O_RDONLY)</code>. This requests a file descriptor to an existing file.' },
+      { active: 'uc-libc', arrows: ['ua1'],
+        text: 'libc\'s <code>open()</code> wrapper (often <code>openat()</code> internally) places the path pointer in RDI and flags in RSI.' },
+      { active: 'uc-reg', arrows: ['ua1','ua2'],
+        text: 'RAX = 2 (SYS_open). The <code>syscall</code> instruction fires, switching the CPU to Ring 0 and jumping to the kernel entry point.' },
+      { active: 'kc-entry', arrows: ['ua1','ua2','ua3'],
+        text: 'The kernel entry point saves the user-space register state. The path string is validated (must be readable user-space memory).' },
+      { active: 'kc-table', arrows: ['ua1','ua2','ua3','ka1'],
+        text: '<code>syscall_table[2]</code> points to <code>sys_open()</code> → <code>do_sys_open()</code>.' },
+      { active: 'kc-handler', arrows: ['ua1','ua2','ua3','ka1','ka2'],
+        text: '<code>do_sys_open()</code> copies the path from user space, then calls <code>path_openat()</code> to resolve the pathname component by component.' },
+      { active: 'kc-vfs', arrows: ['ua1','ua2','ua3','ka1','ka2','ka3'],
+        text: 'The VFS walks the dentry cache. For each path component it checks whether the directory entry (dentry) and inode are already in memory.' },
+      { active: 'kc-fs', arrows: ['ua1','ua2','ua3','ka1','ka2','ka3','ka4'],
+        text: 'On a cache miss, the filesystem driver reads the inode from disk. Permissions are checked; if OK, a new <code>file</code> struct is created.' },
+      { active: 'uc-program', arrows: [],
+        text: 'A fresh file descriptor (small integer) is installed in the process\'s fd table. The kernel returns this integer via RAX; <code>open()</code> returns it to the caller.' },
+    ],
+    quizSteps: [
+      { id: 'qs-a', text: 'User calls open(); RAX=2 (SYS_open); syscall to Ring 0' },
+      { id: 'qs-b', text: 'do_sys_open() copies path from user space' },
+      { id: 'qs-c', text: 'VFS walks dentry cache; filesystem driver reads inode' },
+      { id: 'qs-d', text: 'fd installed in process table; returned to caller' },
+    ],
+    quizOrder: ['qs-a','qs-b','qs-c','qs-d'],
+  },
+};
+
+const ALL_ARROWS = ['ua1','ua2','ua3','ka1','ka2','ka3','ka4'];
+const ALL_COMPS  = ['uc-program','uc-libc','uc-reg','kc-entry','kc-table','kc-handler','kc-vfs','kc-fs'];
+
+let currentSyscall = 'write';
+let currentStep    = -1;
+let playing        = false;
+let playTimer      = null;
+
+function loadSyscall() {
+  currentSyscall = document.getElementById('syscall-select').value;
+  resetAnim();
+  const d = FLOWS[currentSyscall];
+  document.getElementById('uc-prog-name').textContent    = d.progName;
+  document.getElementById('uc-prog-detail').textContent  = d.progDetail;
+  document.getElementById('uc-libc-detail').textContent  = d.libcDetail;
+  document.getElementById('uc-reg-detail').textContent   = d.regDetail;
+  document.getElementById('kc-table-detail').textContent = d.tableDetail;
+  document.getElementById('kc-handler-name').textContent = d.handlerName;
+  document.getElementById('kc-handler-detail').textContent = d.handlerDetail;
+  document.getElementById('kc-vfs-name').textContent     = d.vfsName;
+  document.getElementById('kc-vfs-detail').textContent   = d.vfsDetail;
+  document.getElementById('kc-fs-name').textContent      = d.fsName;
+  document.getElementById('kc-fs-detail').textContent    = d.fsDetail;
+}
+
+function applyStep(i) {
+  const flow = FLOWS[currentSyscall];
+  const s    = flow.steps[i];
+
+  ALL_COMPS.forEach(id => document.getElementById(id).classList.remove('active'));
+  ALL_ARROWS.forEach(id => document.getElementById(id).classList.remove('active'));
+
+  document.getElementById(s.active).classList.add('active');
+  (s.arrows || []).forEach(id => document.getElementById(id).classList.add('active'));
+
+  const bubble = document.getElementById('bubble');
+  bubble.innerHTML = s.text;
+  bubble.classList.remove('idle');
+
+  document.getElementById('step-num').textContent = (i + 1);
+  document.getElementById('step-of').textContent  = `of ${flow.steps.length} steps`;
+
+  document.getElementById('btn-prev').disabled = (i === 0);
+  document.getElementById('btn-next').disabled = (i === flow.steps.length - 1);
+
+  if (i === flow.steps.length - 1) {
+    document.getElementById('btn-quiz').disabled = false;
+  }
+}
+
+function togglePlay() {
+  if (playing) {
+    playing = false;
+    clearTimeout(playTimer);
+    document.getElementById('btn-play').textContent = '▶ Play';
+    document.getElementById('btn-play').classList.remove('primary');
+  } else {
+    playing = true;
+    document.getElementById('btn-play').textContent = '⏸ Pause';
+    document.getElementById('btn-play').classList.add('primary');
+    if (currentStep < 0) currentStep = 0;
+    autoPlay();
+  }
+}
+
+function autoPlay() {
+  if (!playing) return;
+  const total = FLOWS[currentSyscall].steps.length;
+  if (currentStep >= total) { playing = false; return; }
+  applyStep(currentStep);
+  currentStep++;
+  if (currentStep < total) {
+    playTimer = setTimeout(autoPlay, 1600);
+  } else {
+    playing = false;
+    currentStep = total - 1;
+    document.getElementById('btn-play').textContent = '▶ Play';
+    document.getElementById('btn-play').classList.remove('primary');
+  }
+}
+
+function nextStep() {
+  const total = FLOWS[currentSyscall].steps.length;
+  if (currentStep < total - 1) { currentStep++; applyStep(currentStep); }
+}
+function prevStep() {
+  if (currentStep > 0) { currentStep--; applyStep(currentStep); }
+}
+
+function resetAnim() {
+  playing = false;
+  clearTimeout(playTimer);
+  currentStep = -1;
+  ALL_COMPS.forEach(id => document.getElementById(id).classList.remove('active'));
+  ALL_ARROWS.forEach(id => document.getElementById(id).classList.remove('active'));
+  document.getElementById('step-num').textContent = '—';
+  document.getElementById('step-of').textContent  = 'Select a syscall and press Play';
+  const bubble = document.getElementById('bubble');
+  bubble.textContent = 'Choose a system call and press ▶ Play to begin.';
+  bubble.classList.add('idle');
+  document.getElementById('btn-prev').disabled = true;
+  document.getElementById('btn-next').disabled = false;
+  document.getElementById('btn-play').textContent = '▶ Play';
+  document.getElementById('btn-play').classList.remove('primary');
+  document.getElementById('btn-quiz').disabled = true;
+  document.getElementById('quiz').style.display = 'none';
+}
+
+/* ── Quiz drag-and-drop ── */
+let dragId = null;
+
+function showQuiz() {
+  const flow = FLOWS[currentSyscall];
+  const pool = document.getElementById('pool');
+  pool.innerHTML = '';
+
+  // Shuffle
+  const shuffled = [...flow.quizSteps].sort(() => Math.random() - 0.5);
+  shuffled.forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'drag-item';
+    el.id = item.id;
+    el.textContent = item.text;
+    el.draggable = true;
+    el.addEventListener('dragstart', e => { dragId = item.id; e.dataTransfer.effectAllowed = 'move'; });
+    pool.appendChild(el);
+  });
+
+  // Reset slots
+  [1,2,3,4].forEach(i => {
+    const slot = document.getElementById('slot' + i);
+    slot.innerHTML = i;
+    slot.classList.remove('drag-over');
+    slot.ondragover = e => { e.preventDefault(); slot.classList.add('drag-over'); };
+    slot.ondragleave = () => slot.classList.remove('drag-over');
+    slot.ondrop = e => {
+      e.preventDefault();
+      slot.classList.remove('drag-over');
+      if (!dragId) return;
+      // If slot already has an item, move it back to pool
+      const existing = slot.querySelector('.drag-item');
+      if (existing) pool.appendChild(existing);
+      // Remove from wherever it was
+      const el = document.getElementById(dragId);
+      slot.innerHTML = '';
+      slot.appendChild(el);
+      dragId = null;
+    };
+  });
+
+  // Allow dragging back to pool
+  pool.ondragover = e => e.preventDefault();
+  pool.ondrop = e => {
+    e.preventDefault();
+    if (!dragId) return;
+    const el = document.getElementById(dragId);
+    if (el) pool.appendChild(el);
+    dragId = null;
+  };
+
+  document.getElementById('quiz-score').textContent = '';
+  document.getElementById('quiz').style.display = 'block';
+  document.querySelector('.quiz-footer button:first-child').disabled = false;
+}
+
+function checkOrder() {
+  const flow = FLOWS[currentSyscall];
+  let score = 0;
+  [1,2,3,4].forEach((pos, idx) => {
+    const slot = document.getElementById('slot' + pos);
+    const item = slot.querySelector('.drag-item');
+    if (!item) return;
+    item.classList.remove('correct-pos','wrong-pos');
+    if (item.id === flow.quizOrder[idx]) { item.classList.add('correct-pos'); score++; }
+    else item.classList.add('wrong-pos');
+  });
+  document.getElementById('quiz-score').textContent = `Score: ${score} / 4`;
+}
+
+function resetQuiz() {
+  showQuiz();
+}
+
+// Init
+loadSyscall();
+</script>
+</body>
+</html>

@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CS4023 – Tool 2.1 Hardware Interrupt Simulator</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+
+  h1 { font-size: 1.3rem; color: #a0c4ff; margin-bottom: 4px; text-align: center; }
+  .subtitle { font-size: 0.85rem; color: #888; margin-bottom: 16px; text-align: center; }
+
+  /* ── Main layout ── */
+  .main { display: flex; gap: 20px; width: 100%; max-width: 960px; }
+
+  /* ── Diagram panel ── */
+  .diagram {
+    flex: 1 1 520px;
+    background: #12122a;
+    border-radius: 10px;
+    padding: 20px;
+    position: relative;
+    min-height: 420px;
+  }
+
+  .component {
+    position: absolute;
+    border: 2px solid #4a6fa5;
+    border-radius: 8px;
+    background: #1e2a45;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.3s, box-shadow 0.3s, background 0.3s;
+  }
+  .component .label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #a0c4ff;
+    margin-bottom: 4px;
+  }
+  .component .value {
+    font-family: 'Consolas', monospace;
+    font-size: 0.78rem;
+    color: #7ecfff;
+  }
+  .component.active {
+    border-color: #ff8c00;
+    box-shadow: 0 0 14px #ff8c00aa;
+    background: #2a1e08;
+  }
+
+  /* Component positions */
+  #comp-cpu    { left: 30px;  top: 140px; width: 130px; height: 90px; }
+  #comp-stack  { left: 30px;  top: 270px; width: 130px; height: 60px; }
+  #comp-ram    { left: 200px; top:  60px; width: 120px; height: 60px; }
+  #comp-ivt    { left: 200px; top: 200px; width: 140px; height: 90px; }
+  #comp-irq-line { left: 360px; top: 200px; width: 110px; height: 50px; }
+  #comp-keyboard { left: 360px; top: 60px;  width: 110px; height: 60px; }
+
+  /* IRQ line connector */
+  .irq-line {
+    position: absolute;
+    left: 160px; top: 195px;
+    width: 200px; height: 2px;
+    background: #4a6fa5;
+    transition: background 0.3s;
+  }
+  .irq-line.active { background: #ff8c00; box-shadow: 0 0 8px #ff8c00; }
+
+  /* ── Right panel ── */
+  .side-panel {
+    flex: 0 0 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .step-counter {
+    background: #12122a;
+    border-radius: 8px;
+    padding: 14px;
+    text-align: center;
+  }
+  .step-counter .num { font-size: 2rem; font-weight: 700; color: #ff8c00; }
+  .step-counter .of  { font-size: 0.9rem; color: #888; }
+
+  .bubble {
+    background: #12122a;
+    border-radius: 8px;
+    border-left: 4px solid #ff8c00;
+    padding: 14px;
+    font-size: 0.88rem;
+    line-height: 1.55;
+    flex: 1;
+    min-height: 120px;
+  }
+  .bubble.idle { border-left-color: #4a6fa5; color: #888; font-style: italic; }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  button {
+    background: #1e2a45;
+    color: #a0c4ff;
+    border: 1.5px solid #4a6fa5;
+    border-radius: 6px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  button:hover { background: #2a3a60; border-color: #a0c4ff; }
+  button.primary { background: #ff8c00; color: #000; border-color: #ff8c00; font-weight: 700; }
+  button.primary:hover { background: #e07800; }
+  button:disabled { opacity: 0.4; cursor: default; }
+
+  /* ── Raise button area ── */
+  .raise-area {
+    text-align: center;
+    margin-bottom: 10px;
+  }
+
+  /* ── Quiz ── */
+  .quiz-section {
+    width: 100%; max-width: 960px;
+    margin-top: 20px;
+    background: #12122a;
+    border-radius: 10px;
+    padding: 20px;
+    display: none;
+  }
+  .quiz-section h2 { color: #a0c4ff; margin-bottom: 14px; font-size: 1rem; }
+  .q { margin-bottom: 16px; }
+  .q p { margin-bottom: 8px; font-size: 0.9rem; }
+  .q label { display: block; padding: 6px 10px; margin-bottom: 4px; border-radius: 5px;
+             cursor: pointer; background: #1e2a45; border: 1.5px solid #2a3a60; font-size: 0.86rem; }
+  .q label:hover { border-color: #a0c4ff; }
+  .q input[type=radio] { margin-right: 8px; }
+  .q label.correct { border-color: #4caf50; background: #1a3020; }
+  .q label.wrong   { border-color: #e53935; background: #2a1010; }
+
+  .quiz-footer { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
+  #quiz-score { font-size: 1.1rem; font-weight: 600; color: #ff8c00; }
+</style>
+</head>
+<body>
+
+<h1>CS4023 – Tool 2.1: Hardware Interrupt Simulator</h1>
+<p class="subtitle">Step through the sequence of events when a hardware interrupt is raised.</p>
+
+<div class="main">
+  <!-- Diagram -->
+  <div class="diagram" id="diagram">
+    <!-- Components -->
+    <div class="component" id="comp-cpu">
+      <span class="label">CPU</span>
+      <span class="value" id="pc-val">PC = 0x4000A8</span>
+      <span class="value" id="mode-val">Ring 3 (User)</span>
+    </div>
+    <div class="component" id="comp-stack">
+      <span class="label">Kernel Stack</span>
+      <span class="value" id="stack-val">—</span>
+    </div>
+    <div class="component" id="comp-ram">
+      <span class="label">RAM</span>
+      <span class="value">0x0000 – 0xFFFF</span>
+    </div>
+    <div class="component" id="comp-ivt">
+      <span class="label">IDT / IVT</span>
+      <span class="value">IRQ0 → 0xC010</span>
+      <span class="value" id="ivt-val">IRQ1 → 0xC080</span>
+    </div>
+    <div class="component" id="comp-irq-line">
+      <span class="label">IRQ Line</span>
+      <span class="value" id="irq-val">idle</span>
+    </div>
+    <div class="component" id="comp-keyboard">
+      <span class="label">⌨ Keyboard</span>
+      <span class="value" id="key-val">idle</span>
+    </div>
+    <!-- IRQ bus line visual -->
+    <div class="irq-line" id="irq-bus"></div>
+
+    <!-- Labels -->
+    <span style="position:absolute;left:195px;top:43px;font-size:0.7rem;color:#666">Memory</span>
+    <span style="position:absolute;left:355px;top:43px;font-size:0.7rem;color:#666">I/O</span>
+    <span style="position:absolute;left:24px;top:120px;font-size:0.7rem;color:#666">Processor</span>
+  </div>
+
+  <!-- Side panel -->
+  <div class="side-panel">
+    <div class="raise-area">
+      <button class="primary" id="btn-raise" onclick="raiseInterrupt()">⌨ Raise Interrupt</button>
+    </div>
+    <div class="step-counter">
+      <div class="num" id="step-num">—</div>
+      <div class="of" id="step-of">Press "Raise Interrupt" to begin</div>
+    </div>
+    <div class="bubble idle" id="bubble">Waiting for interrupt…</div>
+    <div class="controls">
+      <button id="btn-prev" onclick="prevStep()" disabled>◀ Previous</button>
+      <button id="btn-next" onclick="nextStep()" disabled>Next ▶</button>
+      <button id="btn-replay" onclick="replay()" disabled>↺ Replay</button>
+    </div>
+  </div>
+</div>
+
+<!-- Quiz -->
+<div class="quiz-section" id="quiz">
+  <h2>Quick Quiz — 3 Questions</h2>
+
+  <div class="q" id="q1">
+    <p><strong>Q1.</strong> What does the CPU do <em>before</em> jumping to the ISR?</p>
+    <label><input type="radio" name="q1" value="a"> Sends an EOI to the PIC</label>
+    <label><input type="radio" name="q1" value="b"> Saves PC and registers to the stack</label>
+    <label><input type="radio" name="q1" value="c"> Reads the scan code from port 0x60</label>
+    <label><input type="radio" name="q1" value="d"> Switches back to user mode</label>
+  </div>
+
+  <div class="q" id="q2">
+    <p><strong>Q2.</strong> What data structure maps IRQ numbers to handler addresses?</p>
+    <label><input type="radio" name="q2" value="a"> Page Table</label>
+    <label><input type="radio" name="q2" value="b"> Process Control Block</label>
+    <label><input type="radio" name="q2" value="c"> Interrupt Vector Table (IDT)</label>
+    <label><input type="radio" name="q2" value="d"> File Descriptor Table</label>
+  </div>
+
+  <div class="q" id="q3">
+    <p><strong>Q3.</strong> After the ISR completes, what happens?</p>
+    <label><input type="radio" name="q3" value="a"> The OS reboots</label>
+    <label><input type="radio" name="q3" value="b"> The CPU switches permanently to kernel mode</label>
+    <label><input type="radio" name="q3" value="c"> CPU restores saved state and resumes the interrupted program</label>
+    <label><input type="radio" name="q3" value="d"> The process is killed</label>
+  </div>
+
+  <div class="quiz-footer">
+    <button class="primary" onclick="checkQuiz()">Check Answers</button>
+    <button onclick="resetQuiz()">Try Again</button>
+    <span id="quiz-score"></span>
+  </div>
+</div>
+
+<script>
+const STEPS = [
+  { component: "keyboard", irqBus: false,
+    text: "The user presses a key. The keyboard controller detects the electrical signal and prepares a scan code.",
+    keyVal: "keypress!", irqVal: "idle", pcVal: "PC = 0x4000A8", modeVal: "Ring 3 (User)", stackVal: "—" },
+  { component: "irq-line", irqBus: true,
+    text: "The keyboard controller asserts IRQ1 on the Interrupt Request line connected to the Programmable Interrupt Controller (PIC).",
+    keyVal: "scan code ready", irqVal: "IRQ1 asserted", pcVal: "PC = 0x4000A8", modeVal: "Ring 3 (User)", stackVal: "—" },
+  { component: "cpu", irqBus: false,
+    text: "The CPU completes its current instruction (it never interrupts mid-instruction). The program counter (PC) holds the address of the NEXT instruction.",
+    keyVal: "scan code ready", irqVal: "IRQ1 asserted", pcVal: "PC = 0x4000AC", modeVal: "Ring 3 (User)", stackVal: "—" },
+  { component: "cpu", irqBus: false,
+    text: "The CPU checks the interrupt pending flag. IRQ1 is asserted and interrupts are enabled (IF flag = 1) — the CPU will handle it.",
+    keyVal: "scan code ready", irqVal: "IRQ1 asserted", pcVal: "PC = 0x4000AC", modeVal: "Ring 3 (User)", stackVal: "—" },
+  { component: "stack", irqBus: false,
+    text: "The CPU automatically pushes the current PC, flags, and CS register onto the kernel stack, saving the interrupted context.",
+    keyVal: "scan code ready", irqVal: "IRQ1 pending", pcVal: "PC = 0x4000AC", modeVal: "Ring 3 (User)", stackVal: "PC, FLAGS saved" },
+  { component: "cpu", irqBus: false,
+    text: "The CPU switches from Ring 3 (user mode) to Ring 0 (kernel mode). This enables access to privileged instructions and kernel memory.",
+    keyVal: "scan code ready", irqVal: "IRQ1 pending", pcVal: "PC = 0x4000AC", modeVal: "Ring 0 (Kernel)", stackVal: "PC, FLAGS saved" },
+  { component: "ivt", irqBus: false,
+    text: "The CPU uses the IRQ number (1) as an index into the Interrupt Descriptor Table (IDT). Each entry contains the address of an Interrupt Service Routine.",
+    keyVal: "scan code ready", irqVal: "IRQ1 pending", pcVal: "PC = 0x4000AC", modeVal: "Ring 0 (Kernel)", stackVal: "PC, FLAGS saved" },
+  { component: "ivt", irqBus: false,
+    text: "The IDT entry for IRQ1 points to the keyboard ISR at a known kernel address (0xC080). The CPU loads this address into the PC and jumps there.",
+    keyVal: "scan code ready", irqVal: "dispatching", pcVal: "PC = 0xC080", modeVal: "Ring 0 (Kernel)", stackVal: "PC, FLAGS saved" },
+  { component: "cpu", irqBus: false,
+    text: "The keyboard ISR runs in kernel mode: it reads the scan code from I/O port 0x60, translates it to a keycode, and places it in the keyboard input buffer.",
+    keyVal: "scan code read", irqVal: "handled", pcVal: "PC = 0xC090", modeVal: "Ring 0 (Kernel)", stackVal: "PC, FLAGS saved" },
+  { component: "cpu", irqBus: false,
+    text: "The ISR sends an End-Of-Interrupt (EOI) command to the PIC, then executes IRET. The CPU pops the saved state from the stack and resumes the user program exactly where it left off.",
+    keyVal: "done", irqVal: "idle", pcVal: "PC = 0x4000AC", modeVal: "Ring 3 (User)", stackVal: "—" },
+];
+
+const CORRECT = { q1: 'b', q2: 'c', q3: 'c' };
+let currentStep = -1;
+let started = false;
+
+function highlight(id) {
+  ['comp-cpu','comp-stack','comp-ram','comp-ivt','comp-irq-line','comp-keyboard']
+    .forEach(c => document.getElementById(c).classList.remove('active'));
+  if (id) {
+    const map = {
+      'cpu': 'comp-cpu', 'stack': 'comp-stack', 'ram': 'comp-ram',
+      'ivt': 'comp-ivt', 'irq-line': 'comp-irq-line', 'keyboard': 'comp-keyboard'
+    };
+    if (map[id]) document.getElementById(map[id]).classList.add('active');
+  }
+}
+
+function applyStep(i) {
+  const s = STEPS[i];
+  highlight(s.component);
+  document.getElementById('irq-bus').classList.toggle('active', !!s.irqBus);
+  document.getElementById('pc-val').textContent    = s.pcVal;
+  document.getElementById('mode-val').textContent  = s.modeVal;
+  document.getElementById('stack-val').textContent = s.stackVal;
+  document.getElementById('irq-val').textContent   = s.irqVal;
+  document.getElementById('key-val').textContent   = s.keyVal;
+  document.getElementById('ivt-val').textContent   = 'IRQ1 → 0xC080';
+
+  const bubble = document.getElementById('bubble');
+  bubble.textContent = s.text;
+  bubble.classList.remove('idle');
+
+  document.getElementById('step-num').textContent = (i + 1);
+  document.getElementById('step-of').textContent  = `of ${STEPS.length} steps`;
+
+  document.getElementById('btn-prev').disabled = (i === 0);
+  document.getElementById('btn-next').disabled = (i === STEPS.length - 1);
+
+  if (i === STEPS.length - 1) {
+    document.getElementById('quiz').style.display = 'block';
+  }
+}
+
+function raiseInterrupt() {
+  started = true;
+  currentStep = 0;
+  applyStep(0);
+  document.getElementById('btn-prev').disabled = true;
+  document.getElementById('btn-next').disabled = false;
+  document.getElementById('btn-replay').disabled = false;
+  document.getElementById('btn-raise').disabled = true;
+}
+
+function nextStep() {
+  if (currentStep < STEPS.length - 1) { currentStep++; applyStep(currentStep); }
+}
+
+function prevStep() {
+  if (currentStep > 0) { currentStep--; applyStep(currentStep); }
+}
+
+function replay() {
+  currentStep = 0;
+  applyStep(0);
+  document.getElementById('quiz').style.display = 'none';
+  resetQuiz();
+}
+
+/* Quiz */
+function checkQuiz() {
+  let score = 0;
+  ['q1','q2','q3'].forEach(q => {
+    const selected = document.querySelector(`input[name="${q}"]:checked`);
+    const labels   = document.querySelectorAll(`#${q} label`);
+    labels.forEach(l => { l.classList.remove('correct','wrong'); });
+    labels.forEach(l => {
+      const val = l.querySelector('input').value;
+      if (val === CORRECT[q]) l.classList.add('correct');
+    });
+    if (selected) {
+      if (selected.value === CORRECT[q]) { score++; }
+      else {
+        selected.parentElement.classList.add('wrong');
+      }
+    }
+  });
+  document.getElementById('quiz-score').textContent = `Score: ${score} / 3`;
+}
+
+function resetQuiz() {
+  document.querySelectorAll('.q input[type=radio]').forEach(r => r.checked = false);
+  document.querySelectorAll('.q label').forEach(l => l.classList.remove('correct','wrong'));
+  document.getElementById('quiz-score').textContent = '';
+}
+</script>
+</body>
+</html>
