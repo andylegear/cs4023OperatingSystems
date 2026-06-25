@@ -1,0 +1,8 @@
+* text=auto
+*.js binary
+*.css binary
+*.woff2 binary
+*.png binary
+*.jpg binary
+*.pptx binary
+*.docx binary

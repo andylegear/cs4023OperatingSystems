@@ -1,0 +1,14 @@
+import{E as e,H as t,R as n,S as r,X as i,_ as a,_t as o,g as s,ht as c,x as l}from"./modules/shiki-Dm5aQrj-.js";import{et as u,tt as d}from"./index-g0HgFQiN.js";import{t as f}from"./default-D_DLslwf.js";var p={__name:`L12_1_IO_Systems_Hardware_Drivers_and_Buffering.md__slidev_5`,setup(p){let{$slidev:m,$nav:h,$clicksContext:g,$clicks:_,$page:v,$renderContext:y,$frontmatter:b}=d();return g.setup(),(d,p)=>{let m=t(`CodeBlockWrapper`);return n(),a(f,o(e(c(u)(c(b),4))),{default:i(()=>[p[1]||=s(`h1`,null,`DMA Operation`,-1),r(m,{title:``,ranges:[]},{default:i(()=>[...p[0]||=[s(`pre`,{class:`shiki shiki-themes vitesse-dark vitesse-light slidev-code`,style:{"--shiki-dark":`#dbd7caee`,"--shiki-light":`#393a34`,"--shiki-dark-bg":`#121212`,"--shiki-light-bg":`#ffffff`}},[s(`code`,{class:`language-text`},[s(`span`,{class:`line`},[s(`span`,null,` CPU                    DMA Controller             RAM`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`  │  "Read 512 bytes      │                         │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`  │   from disk block 42  │                         │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`  │   to buffer 0x8000"   │                         │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`  ├──────────────────────→│                         │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`  │                        │  1. Issue read to disk  │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`  │  (CPU does other work) │  2. Disk data → DMA buf │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`  │                        │  3. DMA copies → RAM    │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`  │                        │     (0x8000..0x8200)    │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`  │  Interrupt: "done!" ←──│                         │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`  │ (ISR: data ready)      │                         │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,` DMA bus mastering: device controller has its own bus master capability`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,` — can access RAM without CPU involvement at all (PCIe DMA)`)])])],-1)]]),_:1}),p[2]||=s(`p`,null,[s(`strong`,null,`DMA coherence:`),l(` CPU caches may hold stale data after DMA write.`),s(`br`),l(` Solution: `),s(`strong`,null,`cache invalidation`),l(` before DMA read-back, or use `),s(`strong`,null,`coherent DMA`),l(` mappings (`),s(`code`,null,`dma_alloc_coherent()`),l(` in Linux).`)],-1)]),_:1},16)}}};export{p as default};

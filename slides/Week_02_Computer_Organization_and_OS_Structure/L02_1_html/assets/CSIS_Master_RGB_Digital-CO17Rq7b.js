@@ -1,0 +1,1 @@
+var e=`/cs4023OperatingSystems/slides/Week_02_Computer_Organization_and_OS_Structure/L02_1_html/assets/CSIS_Master_RGB_Digital-C1Rq25Ab.png`;export{e as t};

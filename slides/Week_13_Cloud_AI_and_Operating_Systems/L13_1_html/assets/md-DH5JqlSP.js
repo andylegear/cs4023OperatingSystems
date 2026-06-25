@@ -1,0 +1,15 @@
+import{E as e,H as t,R as n,S as r,X as i,_ as a,_t as o,g as s,ht as c,x as l}from"./modules/shiki-Dm5aQrj-.js";import{et as u,tt as d}from"./index-DqCvfA1r.js";import{t as f}from"./default-BfkXoH1K.js";var p={__name:`L13_1_Cloud_Computing_and_Operating_Systems.md__slidev_3`,setup(p){let{$slidev:m,$nav:h,$clicksContext:g,$clicks:_,$page:v,$renderContext:y,$frontmatter:b}=d();return g.setup(),(d,p)=>{let m=t(`CodeBlockWrapper`);return n(),a(f,o(e(c(u)(c(b),2))),{default:i(()=>[p[1]||=s(`h1`,null,`Cloud Computing Models — IaaS, PaaS, SaaS`,-1),r(m,{title:``,ranges:[]},{default:i(()=>[...p[0]||=[s(`pre`,{class:`shiki shiki-themes vitesse-dark vitesse-light slidev-code`,style:{"--shiki-dark":`#dbd7caee`,"--shiki-light":`#393a34`,"--shiki-dark-bg":`#121212`,"--shiki-light-bg":`#ffffff`}},[s(`code`,{class:`language-text`},[s(`span`,{class:`line`},[s(`span`,null,` ┌─────────────────────────────────────────────────┐`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,` │  SaaS — Software as a Service                   │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,` │  (Gmail, Office 365, Salesforce)                │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,` │  OS role: managed completely by provider        │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,` ├─────────────────────────────────────────────────┤`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,` │  PaaS — Platform as a Service                   │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,` │  (Azure App Service, Heroku, Google App Engine) │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,` │  OS role: managed by provider; developer sees   │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,` │  language runtime and APIs, not OS              │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,` ├─────────────────────────────────────────────────┤`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,` │  IaaS — Infrastructure as a Service             │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,` │  (AWS EC2, Azure VMs, Google Compute Engine)    │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,` │  OS role: customer installs and manages guest OS│`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,` │  Provider manages hypervisor and hardware       │`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,` └─────────────────────────────────────────────────┘`)])])],-1)]]),_:1}),p[2]||=s(`p`,null,[s(`strong`,null,`At IaaS level:`),l(` customer must patch guest OS, configure kernel parameters, manage drivers.`)],-1),p[3]||=s(`p`,null,[s(`strong`,null,`At PaaS level:`),l(` OS is abstracted — developer deploys code, not VMs. Provider ensures OS security, updates, scaling.`)],-1),p[4]||=s(`p`,null,[s(`strong`,null,`At SaaS level:`),l(` OS is entirely hidden — user interacts via browser/API.`)],-1)]),_:1},16)}}};export{p as default};

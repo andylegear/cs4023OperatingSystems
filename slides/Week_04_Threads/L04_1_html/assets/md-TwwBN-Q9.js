@@ -1,0 +1,11 @@
+import{E as e,H as t,R as n,S as r,X as i,_ as a,_t as o,g as s,ht as c,x as l}from"./modules/shiki-Dm5aQrj-.js";import{et as u,tt as d}from"./index-7yioIWum.js";import{t as f}from"./default-B-4tPZJL.js";var p={__name:`L04_1_Threads_Concepts_and_Models.md__slidev_13`,setup(p){let{$slidev:m,$nav:h,$clicksContext:g,$clicks:_,$page:v,$renderContext:y,$frontmatter:b}=d();return g.setup(),(d,p)=>{let m=t(`CodeBlockWrapper`);return n(),a(f,o(e(c(u)(c(b),12))),{default:i(()=>[p[1]||=s(`h1`,null,`Multithreading on Multicore: Reality Check`,-1),p[2]||=s(`p`,null,[s(`strong`,null,`Amdahl’s Law example:`)],-1),p[3]||=s(`p`,null,`Program with 50% parallelisable code:`,-1),r(m,{title:``,ranges:[]},{default:i(()=>[...p[0]||=[s(`pre`,{class:`shiki shiki-themes vitesse-dark vitesse-light slidev-code`,style:{"--shiki-dark":`#dbd7caee`,"--shiki-light":`#393a34`,"--shiki-dark-bg":`#121212`,"--shiki-light-bg":`#ffffff`}},[s(`code`,{class:`language-text`},[s(`span`,{class:`line`},[s(`span`,null,`1 core:   ─── serial (50%) ─── parallel (50% runs in 50% time) ───`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`          Total: 1.0 unit`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`2 cores:  ─── serial (50%) ─── parallel (50% runs in 25% time) ───`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`          Total: 0.75 units   → Speedup = 1.33×`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`4 cores:  ─── serial (50%) ─── parallel (50% runs in 12.5% time) ──`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`          Total: 0.625 units  → Speedup = 1.6×`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`∞ cores:  ─── serial (50%) ──────────────────────────────────────`)]),l(`
+`),s(`span`,{class:`line`},[s(`span`,null,`          Total: 0.5 units    → Max speedup = 2.0×  ← ceiling!`)])])],-1)]]),_:1}),p[4]||=s(`p`,null,[s(`strong`,null,`Lesson`),l(`: heavy parallelisation only pays off when the serial fraction is very small.`),s(`br`),l(` Identifying and eliminating serial bottlenecks (locks, I/O) is as important as adding threads.`)],-1)]),_:1},16)}}};export{p as default};
