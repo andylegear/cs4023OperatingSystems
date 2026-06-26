@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tool 9.1 – Deadlock Graph Builder & Banker's Algorithm</title>
+<style>
+  :root {
+    --navy: #0d1b2a;
+    --navy2: #1a2e44;
+    --orange: #ff8c00;
+    --green: #22c55e;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --border: #2d4a6a;
+    --card: #162235;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: var(--navy); color: var(--text); min-height: 100vh; }
+  header { background: var(--navy2); border-bottom: 2px solid var(--orange); padding: 14px 24px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 1.2rem; color: var(--orange); }
+  header span { color: var(--muted); font-size: 0.85rem; }
+  .tabs { display: flex; border-bottom: 2px solid var(--border); background: var(--navy2); }
+  .tab { padding: 10px 24px; cursor: pointer; color: var(--muted); font-size: 0.9rem; border-bottom: 3px solid transparent; transition: all 0.2s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--orange); border-bottom-color: var(--orange); }
+  .panel { display: none; padding: 20px; }
+  .panel.active { display: block; }
+  .explain { background: var(--card); border-left: 4px solid var(--orange); border-radius: 6px; padding: 12px 16px; margin-bottom: 18px; font-size: 0.85rem; color: var(--muted); line-height: 1.6; }
+  .explain strong { color: var(--text); }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; flex: 1; min-width: 280px; }
+  .card h3 { color: var(--orange); margin-bottom: 12px; font-size: 0.95rem; }
+  label { font-size: 0.82rem; color: var(--muted); display: block; margin-bottom: 4px; }
+  input[type=number], select {
+    width: 100%; padding: 7px 10px; background: var(--navy2); border: 1px solid var(--border);
+    border-radius: 5px; color: var(--text); font-size: 0.85rem; margin-bottom: 10px;
+  }
+  .matrix-table { border-collapse: collapse; width: 100%; font-size: 0.82rem; margin-bottom: 10px; }
+  .matrix-table th { background: var(--navy2); color: var(--muted); padding: 5px 8px; border: 1px solid var(--border); text-align: center; }
+  .matrix-table td { border: 1px solid var(--border); padding: 3px; }
+  .matrix-table input { width: 48px; padding: 4px 6px; background: var(--navy); border: 1px solid var(--border); border-radius: 3px; color: var(--text); text-align: center; margin: 0; }
+  .btn { padding: 8px 18px; border: none; border-radius: 5px; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: opacity 0.2s; margin: 3px; }
+  .btn-orange { background: var(--orange); color: #fff; }
+  .btn-blue { background: var(--blue); color: #fff; }
+  .btn-green { background: var(--green); color: #fff; }
+  .btn-red { background: var(--red); color: #fff; }
+  .btn-grey { background: #334155; color: var(--text); }
+  .btn:hover { opacity: 0.85; }
+  canvas { border: 1px solid var(--border); border-radius: 8px; background: #0a1520; display: block; max-width: 100%; }
+  .result { background: var(--navy2); border-radius: 6px; padding: 10px 14px; margin-top: 12px; font-size: 0.85rem; min-height: 40px; }
+  .result.ok { border-left: 4px solid var(--green); }
+  .result.err { border-left: 4px solid var(--red); }
+  .result.info { border-left: 4px solid var(--blue); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.78rem; font-weight: 700; margin: 2px; }
+  .badge-green { background: #166534; color: #86efac; }
+  .badge-red { background: #7f1d1d; color: #fca5a5; }
+  .badge-orange { background: #7c2d12; color: #fdba74; }
+  .step-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 5px; margin-bottom: 6px; background: var(--navy2); font-size: 0.83rem; }
+  .step-row.done { opacity: 0.55; }
+  .step-row.current { border: 1px solid var(--orange); }
+  .avail { display: inline-block; font-family: monospace; background: #1e3a5f; padding: 2px 6px; border-radius: 3px; }
+  .scenario-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  @media (max-width: 600px) { .row { flex-direction: column; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🔗 Tool 9.1 — Deadlock Graph Builder &amp; Banker's Algorithm</h1>
+    <span>CS4023 Operating Systems · Week 9</span>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab(0)">Resource Allocation Graph</div>
+  <div class="tab" onclick="switchTab(1)">Banker's Algorithm</div>
+</div>
+
+<!-- TAB 0: RAG Builder -->
+<div class="panel active" id="tab0">
+  <div class="explain">
+    <strong>Resource Allocation Graph (RAG)</strong> — Process nodes (circles) request resource nodes (rectangles).
+    An <em>assignment edge</em> goes from resource → process (resource is held).
+    A <em>request edge</em> goes from process → resource (process wants it).
+    <strong>Cycle rule:</strong> if all resources have a single instance, a cycle means deadlock.
+    For multi-instance resources, a cycle is necessary but not sufficient — use Banker's Algorithm.
+  </div>
+
+  <div class="row">
+    <div class="card" style="max-width:340px">
+      <h3>Configuration</h3>
+      <label>Processes (2–4)</label>
+      <input type="number" id="ragP" min="2" max="4" value="3" oninput="buildRagInputs()" />
+      <label>Resource types (1–3)</label>
+      <input type="number" id="ragR" min="1" max="3" value="2" oninput="buildRagInputs()" />
+      <label>Instances per resource type</label>
+      <div id="instanceInputs"></div>
+
+      <h3 style="margin-top:12px">Allocation matrix (what each process holds)</h3>
+      <div id="allocTable"></div>
+      <h3>Request matrix (what each process wants)</h3>
+      <div id="reqTable"></div>
+
+      <div style="margin-top:8px">
+        <button class="btn btn-orange" onclick="drawRAG()">Build Graph</button>
+        <button class="btn btn-red" onclick="detectCycle()">Detect Cycle</button>
+        <button class="btn btn-grey" onclick="clearRAG()">Clear</button>
+      </div>
+      <div id="ragResult" class="result info" style="margin-top:10px">Fill in the matrices and click Build Graph.</div>
+    </div>
+
+    <div class="card" style="flex:2">
+      <h3>Graph</h3>
+      <div class="scenario-btns">
+        <button class="btn btn-grey" onclick="loadScenario('deadlock')">Load: Classic Deadlock</button>
+        <button class="btn btn-grey" onclick="loadScenario('safe')">Load: No Deadlock</button>
+        <button class="btn btn-grey" onclick="loadScenario('multiinstance')">Load: Multi-instance (cycle, no deadlock)</button>
+      </div>
+      <canvas id="ragCanvas" width="560" height="360"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 1: Banker's Algorithm -->
+<div class="panel" id="tab1">
+  <div class="explain">
+    <strong>Banker's Algorithm (Dijkstra, 1965)</strong> — Given the current Allocation, Max demand, and Available resources,
+    determine whether the system is in a <em>safe state</em>: a state where a safe sequence exists so that every process
+    can eventually complete. At each step, find any process whose <strong>Need ≤ Work</strong>; run it, release its resources,
+    repeat until all processes finish (SAFE) or none can proceed (UNSAFE).
+  </div>
+
+  <div class="row" style="margin-bottom:12px">
+    <div class="card">
+      <h3>Scenario</h3>
+      <div class="scenario-btns">
+        <button class="btn btn-grey" onclick="loadBankers('safe3')">Safe (3P, 2R)</button>
+        <button class="btn btn-grey" onclick="loadBankers('unsafe')">Unsafe (3P, 2R)</button>
+        <button class="btn btn-grey" onclick="loadBankers('safe5')">Silberschatz 5P (A,B,C)</button>
+        <button class="btn btn-grey" onclick="loadBankers('custom')">Custom input</button>
+      </div>
+      <div id="bankersCustom" style="display:none">
+        <label>Processes</label><input type="number" id="bkP" min="2" max="6" value="3" oninput="buildBankersCustom()" />
+        <label>Resources</label><input type="number" id="bkR" min="1" max="4" value="2" oninput="buildBankersCustom()" />
+        <label>Total resources (comma-separated)</label><input type="text" id="bkTotal" value="4,3" />
+        <div id="bkCustomTables"></div>
+        <button class="btn btn-orange" onclick="runBankersFromCustom()" style="margin-top:8px">Load Custom</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="bankersArea">
+    <div class="row">
+      <div class="card">
+        <h3>State Tables</h3>
+        <div id="bankersStateTables"></div>
+      </div>
+      <div class="card" style="min-width:300px">
+        <h3>Safety Algorithm Stepper</h3>
+        <div id="bankersSteps"></div>
+        <div style="margin-top:12px">
+          <button class="btn btn-orange" id="btnNextStep" onclick="bankersNextStep()">▶ Next Step</button>
+          <button class="btn btn-green" onclick="bankersRunAll()">⏩ Run All</button>
+          <button class="btn btn-grey" onclick="bankersReset()">↺ Reset</button>
+        </div>
+        <div id="bankersResult" class="result info" style="margin-top:10px">Click Next Step to start the algorithm.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== UTILS =====================
+function el(id) { return document.getElementById(id); }
+
+// ===================== RAG SECTION =====================
+let ragState = { p: 3, r: 2, instances: [1,1], alloc: null, req: null, cycleEdges: [] };
+
+function buildRagInputs() {
+  const p = Math.max(2, Math.min(4, parseInt(el('ragP').value) || 3));
+  const r = Math.max(1, Math.min(3, parseInt(el('ragR').value) || 2));
+  ragState.p = p; ragState.r = r;
+
+  // Instance inputs
+  let inst = '';
+  for (let j = 0; j < r; j++) {
+    const v = (ragState.instances[j] || 1);
+    inst += `<label>R${j} instances</label><input type="number" id="inst${j}" min="1" max="4" value="${v}" style="width:80px;margin-bottom:6px" />`;
+  }
+  el('instanceInputs').innerHTML = inst;
+
+  // Alloc table
+  el('allocTable').innerHTML = buildMatrixHTML('alloc', p, r, ragState.alloc);
+  el('reqTable').innerHTML = buildMatrixHTML('req', p, r, ragState.req);
+}
+
+function buildMatrixHTML(prefix, p, r, existing) {
+  let h = '<table class="matrix-table"><thead><tr><th>Process</th>';
+  for (let j = 0; j < r; j++) h += `<th>R${j}</th>`;
+  h += '</tr></thead><tbody>';
+  for (let i = 0; i < p; i++) {
+    h += `<tr><td style="padding:4px 8px;text-align:center;color:var(--orange)">P${i}</td>`;
+    for (let j = 0; j < r; j++) {
+      const v = existing ? (existing[i] ? existing[i][j] : 0) : 0;
+      h += `<td><input type="number" id="${prefix}_${i}_${j}" min="0" max="10" value="${v}" /></td>`;
+    }
+    h += '</tr>';
+  }
+  h += '</tbody></table>';
+  return h;
+}
+
+function readMatrix(prefix, p, r) {
+  const m = [];
+  for (let i = 0; i < p; i++) {
+    m.push([]);
+    for (let j = 0; j < r; j++) {
+      m[i].push(parseInt(el(`${prefix}_${i}_${j}`)?.value || 0));
+    }
+  }
+  return m;
+}
+
+function getInstances() {
+  const arr = [];
+  for (let j = 0; j < ragState.r; j++) arr.push(parseInt(el(`inst${j}`)?.value || 1));
+  return arr;
+}
+
+// Layout: processes on left, resources on right
+function ragLayout(p, r, W, H) {
+  const nodes = {};
+  const pH = H / (p + 1);
+  for (let i = 0; i < p; i++) nodes[`P${i}`] = { x: 110, y: pH * (i + 1), type: 'process', label: `P${i}` };
+  const rH = H / (r + 1);
+  for (let j = 0; j < r; j++) nodes[`R${j}`] = { x: W - 110, y: rH * (j + 1), type: 'resource', label: `R${j}`, instances: ragState.instances[j] || 1 };
+  return nodes;
+}
+
+function drawRAG(highlight) {
+  ragState.cycleEdges = highlight || [];
+  const p = ragState.p, r = ragState.r;
+  ragState.instances = getInstances();
+  const alloc = readMatrix('alloc', p, r);
+  const req = readMatrix('req', p, r);
+  ragState.alloc = alloc; ragState.req = req;
+
+  const canvas = el('ragCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const nodes = ragLayout(p, r, W, H);
+
+  // Draw edges first
+  for (let i = 0; i < p; i++) {
+    for (let j = 0; j < r; j++) {
+      const pn = nodes[`P${i}`], rn = nodes[`R${j}`];
+      // Allocation edge: R -> P
+      if (alloc[i][j] > 0) {
+        const isCycle = ragState.cycleEdges.some(e => e[0] === `R${j}` && e[1] === `P${i}`);
+        drawArrow(ctx, rn.x - 22, rn.y, pn.x + 18, pn.y, isCycle ? '#ef4444' : '#22c55e', isCycle ? 2.5 : 1.5, alloc[i][j] > 1 ? `×${alloc[i][j]}` : '');
+      }
+      // Request edge: P -> R
+      if (req[i][j] > 0) {
+        const isCycle = ragState.cycleEdges.some(e => e[0] === `P${i}` && e[1] === `R${j}`);
+        drawArrow(ctx, pn.x + 18, pn.y, rn.x - 22, rn.y, isCycle ? '#ef4444' : '#f59e0b', isCycle ? 2.5 : 1.5, req[i][j] > 1 ? `×${req[i][j]}` : '');
+      }
+    }
+  }
+
+  // Draw nodes
+  for (const [, nd] of Object.entries(nodes)) {
+    if (nd.type === 'process') {
+      ctx.beginPath();
+      ctx.arc(nd.x, nd.y, 18, 0, Math.PI * 2);
+      ctx.fillStyle = '#1e3a5f';
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 2;
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#e2e8f0'; ctx.font = 'bold 14px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(nd.label, nd.x, nd.y);
+    } else {
+      // Resource: rectangle with dots
+      const rx = nd.x - 22, ry = nd.y - 18, rw = 44, rh = 36;
+      ctx.fillStyle = '#1e3a5f'; ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.roundRect(rx, ry, rw, rh, 4); ctx.fill(); ctx.stroke();
+      // dots for instances
+      const inst = nd.instances;
+      const dotR = 4;
+      const cols = Math.min(inst, 3), rows = Math.ceil(inst / 3);
+      for (let d = 0; d < inst; d++) {
+        const col = d % cols, row = Math.floor(d / cols);
+        const dx = nd.x - (cols - 1) * 7 + col * 14;
+        const dy = nd.y - (rows - 1) * 7 + row * 14;
+        ctx.beginPath(); ctx.arc(dx, dy, dotR, 0, Math.PI * 2);
+        ctx.fillStyle = '#f59e0b'; ctx.fill();
+      }
+      ctx.fillStyle = '#e2e8f0'; ctx.font = 'bold 11px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(nd.label, nd.x, nd.y + 26);
+    }
+  }
+
+  // Legend
+  ctx.font = '11px Segoe UI'; ctx.textBaseline = 'middle';
+  drawArrow(ctx, 10, H - 30, 50, H - 30, '#22c55e', 1.5); ctx.fillStyle = '#22c55e'; ctx.textAlign = 'left'; ctx.fillText('Assignment (R→P)', 55, H - 30);
+  drawArrow(ctx, 10, H - 14, 50, H - 14, '#f59e0b', 1.5); ctx.fillStyle = '#f59e0b'; ctx.textAlign = 'left'; ctx.fillText('Request (P→R)', 55, H - 14);
+
+  el('ragResult').className = 'result info';
+  el('ragResult').textContent = 'Graph built. Click Detect Cycle to check for cycles.';
+}
+
+function drawArrow(ctx, x1, y1, x2, y2, color, width, label) {
+  const headLen = 10;
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  ctx.save();
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
+  ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
+  ctx.closePath(); ctx.fill();
+  if (label) {
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    ctx.font = '10px Segoe UI'; ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, mx, my - 8);
+  }
+  ctx.restore();
+}
+
+function detectCycle() {
+  const p = ragState.p, r = ragState.r;
+  const alloc = ragState.alloc || readMatrix('alloc', p, r);
+  const req = ragState.req || readMatrix('req', p, r);
+  const inst = getInstances();
+
+  // Build adjacency: node indices 0..p-1 = processes, p..p+r-1 = resources
+  // Assignment edge: resource j (idx p+j) -> process i (idx i)
+  // Request edge: process i -> resource j (idx p+j)
+  const N = p + r;
+  const adj = Array.from({length: N}, () => Array(N).fill(false));
+  const edgeMap = {}; // idx->idx to edge label
+
+  for (let i = 0; i < p; i++) {
+    for (let j = 0; j < r; j++) {
+      if (alloc[i][j] > 0) { adj[p + j][i] = true; edgeMap[`${p+j},${i}`] = [`R${j}`, `P${i}`]; }
+      if (req[i][j] > 0) { adj[i][p + j] = true; edgeMap[`${i},${p+j}`] = [`P${i}`, `R${j}`]; }
+    }
+  }
+
+  // DFS cycle detection
+  const visited = Array(N).fill(false), inStack = Array(N).fill(false);
+  const parent = Array(N).fill(-1);
+  let cycleStart = -1, cycleEnd = -1;
+
+  function dfs(u) {
+    visited[u] = true; inStack[u] = true;
+    for (let v = 0; v < N; v++) {
+      if (!adj[u][v]) continue;
+      if (!visited[v]) { parent[v] = u; if (dfs(v)) return true; }
+      else if (inStack[v]) { cycleStart = v; cycleEnd = u; return true; }
+    }
+    inStack[u] = false; return false;
+  }
+
+  let found = false;
+  for (let u = 0; u < N; u++) if (!visited[u]) { if (dfs(u)) { found = true; break; } }
+
+  if (!found) {
+    drawRAG([]);
+    const res = el('ragResult'); res.className = 'result ok';
+    res.textContent = '✅ No cycle detected — system is NOT in a deadlocked state.';
+    return;
+  }
+
+  // Reconstruct cycle path
+  const cyclePath = [];
+  let cur = cycleEnd;
+  while (cur !== cycleStart) { cyclePath.unshift(cur); cur = parent[cur]; }
+  cyclePath.unshift(cycleStart);
+  cyclePath.push(cycleEnd);
+
+  const cycleEdges = [];
+  for (let k = 0; k < cyclePath.length - 1; k++) {
+    const u = cyclePath[k], v = cyclePath[k + 1];
+    if (edgeMap[`${u},${v}`]) cycleEdges.push(edgeMap[`${u},${v}`]);
+  }
+
+  drawRAG(cycleEdges);
+
+  // Multi-instance check: cycle does NOT guarantee deadlock if any resource has >1 instance
+  const allSingle = inst.every(x => x === 1);
+  const res = el('ragResult');
+  if (allSingle) {
+    res.className = 'result err';
+    res.innerHTML = '🔴 <strong>Cycle detected — DEADLOCK confirmed.</strong> All resources are single-instance, so a cycle guarantees deadlock. Cycle edges shown in red.';
+  } else {
+    res.className = 'result info';
+    res.innerHTML = '🟡 <strong>Cycle detected, but not necessarily a deadlock.</strong> At least one resource has multiple instances — a cycle is necessary but not sufficient. Use the Banker\'s Algorithm tab to verify.';
+  }
+}
+
+function clearRAG() {
+  buildRagInputs();
+  const ctx = el('ragCanvas').getContext('2d');
+  ctx.clearRect(0, 0, el('ragCanvas').width, el('ragCanvas').height);
+  el('ragResult').className = 'result info';
+  el('ragResult').textContent = 'Fill in the matrices and click Build Graph.';
+}
+
+function loadScenario(name) {
+  if (name === 'deadlock') {
+    // P0 holds R0, wants R1; P1 holds R1, wants R0 — classic cycle
+    el('ragP').value = 2; el('ragR').value = 2;
+    buildRagInputs();
+    el('inst0').value = 1; el('inst1').value = 1;
+    el('alloc_0_0').value = 1; el('alloc_1_1').value = 1;
+    el('req_0_1').value = 1; el('req_1_0').value = 1;
+  } else if (name === 'safe') {
+    // P0 holds R0; P1 holds R1, wants R0; P2 wants R1 — P0 can finish, releases R0 for P1
+    el('ragP').value = 3; el('ragR').value = 2;
+    buildRagInputs();
+    el('inst0').value = 1; el('inst1').value = 1;
+    el('alloc_0_0').value = 1; el('alloc_1_1').value = 1;
+    el('req_1_0').value = 1; el('req_2_1').value = 1;
+  } else if (name === 'multiinstance') {
+    // R0 has 2 instances; P0 holds 1, P1 holds 1, P2 wants R0 — cycle in request but NOT deadlock
+    el('ragP').value = 3; el('ragR').value = 1;
+    buildRagInputs();
+    el('inst0').value = 2;
+    el('alloc_0_0').value = 1; el('alloc_1_0').value = 1;
+    el('req_2_0').value = 1;
+  }
+  setTimeout(() => drawRAG(), 50);
+}
+
+// ===================== BANKER'S SECTION =====================
+let bkState = { n: 0, m: 0, total: [], alloc: [], max: [], avail: [], need: [], finish: [], work: [], step: 0, safeSeq: [], done: false };
+
+function loadBankers(name) {
+  el('bankersCustom').style.display = 'none';
+  let n, m, total, alloc, max;
+
+  if (name === 'safe3') {
+    // 3 processes, 2 resources, safe scenario: P2->P0->P1
+    n = 3; m = 2; total = [4, 3];
+    alloc = [[1,1],[2,0],[0,2]]; max = [[2,2],[3,2],[2,2]];
+    // Available = total - sum(alloc) = [4,3]-[3,3] = [1,0]
+    // Need: P0=[1,1], P1=[1,2], P2=[2,0]
+    // P2 need=[2,0] vs avail=[1,0]: 2>1 NO. P0 need=[1,1] vs [1,0]: 1>0 NO. P1 need=[1,2] vs [1,0]: 2>0 NO. Hmm.
+    // Let's use available=[2,1]: P2 need=[2,0]<=[2,1] YES -> avail=[2,1]+[0,2]=[2,3]. P0 need=[1,1]<=[2,3] YES -> avail=[3,4]. P1 need=[1,2]<=[3,4] YES. Safe: P2,P0,P1
+    alloc = [[1,1],[2,0],[0,2]]; max = [[2,2],[3,2],[2,2]]; total = [5, 4];
+    // sum alloc = [3,3], avail = [2,1]
+  } else if (name === 'unsafe') {
+    // 3 processes, 2 resources — unsafe
+    n = 3; m = 2; total = [4, 3];
+    alloc = [[2,1],[1,1],[1,0]]; max = [[3,3],[2,2],[2,2]];
+    // avail = [4,3]-[4,2] = [0,1]
+    // need: P0=[1,2], P1=[1,1], P2=[1,2]
+    // P1 need=[1,1] vs [0,1]: 1>0 NO. P0 need=[1,2] vs [0,1]: NO. P2=[1,2]: NO. UNSAFE.
+  } else if (name === 'safe5') {
+    // Silberschatz 5-process, 3-resource textbook example
+    n = 5; m = 3; total = [10, 5, 7];
+    alloc = [[0,1,0],[2,0,0],[3,0,2],[2,1,1],[0,0,2]];
+    max =   [[7,5,3],[3,2,2],[9,0,2],[2,2,2],[4,3,3]];
+    // avail = [10,5,7] - [7,2,5] = [3,3,2]
+    // Safe seq: P1, P3, P4, P0, P2
+  } else { return; }
+
+  // Compute avail
+  const sumAlloc = Array(m).fill(0);
+  for (let i = 0; i < n; i++) for (let j = 0; j < m; j++) sumAlloc[j] += alloc[i][j];
+  const avail = total.map((t, j) => t - sumAlloc[j]);
+
+  initBankers(n, m, total, alloc, max, avail);
+}
+
+function loadBankers_custom_show() {
+  el('bankersCustom').style.display = 'block';
+  buildBankersCustom();
+}
+
+function buildBankersCustom() {
+  const p = parseInt(el('bkP').value) || 3;
+  const r = parseInt(el('bkR').value) || 2;
+  let html = '<h4 style="color:var(--muted);margin:8px 0 4px">Allocation</h4>' + buildMatrixHTML('bkAlloc', p, r, null);
+  html += '<h4 style="color:var(--muted);margin:8px 0 4px">Max</h4>' + buildMatrixHTML('bkMax', p, r, null);
+  el('bkCustomTables').innerHTML = html;
+}
+
+function runBankersFromCustom() {
+  const p = parseInt(el('bkP').value) || 3;
+  const r = parseInt(el('bkR').value) || 2;
+  const totalStr = el('bkTotal').value.split(',').map(x => parseInt(x.trim()));
+  const alloc = readMatrix('bkAlloc', p, r);
+  const max = readMatrix('bkMax', p, r);
+  const sumAlloc = Array(r).fill(0);
+  for (let i = 0; i < p; i++) for (let j = 0; j < r; j++) sumAlloc[j] += alloc[i][j];
+  const avail = totalStr.map((t, j) => t - (sumAlloc[j] || 0));
+  initBankers(p, r, totalStr, alloc, max, avail);
+}
+
+function initBankers(n, m, total, alloc, max, avail) {
+  const need = alloc.map((row, i) => row.map((v, j) => max[i][j] - v));
+  bkState = { n, m, total, alloc: alloc.map(r => [...r]), max: max.map(r => [...r]),
+    avail: [...avail], need: need.map(r => [...r]),
+    finish: Array(n).fill(false), work: [...avail],
+    step: 0, safeSeq: [], done: false };
+
+  renderBankersState();
+  renderBankersSteps();
+  el('bankersResult').className = 'result info';
+  el('bankersResult').textContent = 'Click Next Step to begin the safety algorithm.';
+}
+
+function renderBankersState() {
+  const { n, m, alloc, max, need, avail, finish } = bkState;
+  let rNames = Array.from({length: m}, (_, j) => `R${j}`);
+  const thRow = rNames.map(r => `<th>${r}</th>`).join('');
+
+  let html = `<table class="matrix-table"><thead><tr><th>P</th>${thRow}${thRow}${thRow}</tr>
+    <tr><th></th>${Array(m).fill('<th style="color:#22c55e">Alloc</th>').join('')}${Array(m).fill('<th style="color:#f59e0b">Max</th>').join('')}${Array(m).fill('<th style="color:#60a5fa">Need</th>').join('')}</tr></thead><tbody>`;
+  for (let i = 0; i < n; i++) {
+    const done = finish[i];
+    html += `<tr style="${done ? 'opacity:0.4' : ''}">
+      <td style="text-align:center;font-weight:bold;color:var(--orange)">${done ? '✓ ' : ''}P${i}</td>
+      ${alloc[i].map(v => `<td style="text-align:center;color:#22c55e">${v}</td>`).join('')}
+      ${max[i].map(v => `<td style="text-align:center;color:#f59e0b">${v}</td>`).join('')}
+      ${need[i].map(v => `<td style="text-align:center;color:#60a5fa">${v}</td>`).join('')}
+    </tr>`;
+  }
+  html += `</tbody></table>`;
+  html += `<div style="margin-top:8px;font-size:0.82rem">Available: <span class="avail">[${avail.join(', ')}]</span> &nbsp; Work: <span class="avail">[${bkState.work.join(', ')}]</span></div>`;
+  el('bankersStateTables').innerHTML = html;
+}
+
+function renderBankersSteps() {
+  const { n, m, safeSeq, finish, work, done } = bkState;
+  let html = '';
+  for (let k = 0; k < safeSeq.length; k++) {
+    const pi = safeSeq[k];
+    html += `<div class="step-row done">✅ Step ${k + 1}: P${pi} selected — Need ≤ Work. P${pi} finishes. Work updated.</div>`;
+  }
+  if (!done) {
+    // Show eligible processes
+    const eligible = [];
+    for (let i = 0; i < n; i++) {
+      if (!finish[i] && bkState.need[i].every((v, j) => v <= work[j])) eligible.push(i);
+    }
+    if (eligible.length > 0) {
+      html += `<div class="step-row current">Step ${safeSeq.length + 1}: Eligible: ${eligible.map(i => `P${i}`).join(', ')}. Click Next Step to schedule first eligible.</div>`;
+    } else if (safeSeq.length < n) {
+      html += `<div class="step-row" style="border-left:4px solid var(--red)">No eligible process — system is UNSAFE.</div>`;
+    }
+  }
+  if (done) {
+    if (bkState.safeSeq.length === n) {
+      html += `<div class="step-row" style="border-left:4px solid var(--green)">✅ Safe sequence found: &lt;${safeSeq.map(i => `P${i}`).join(' → ')}&gt;</div>`;
+    } else {
+      html += `<div class="step-row" style="border-left:4px solid var(--red)">🔴 UNSAFE — cannot complete all processes.</div>`;
+    }
+  }
+  el('bankersSteps').innerHTML = html;
+}
+
+function bankersNextStep() {
+  if (bkState.done) return;
+  const { n, m, need, alloc, finish, work, safeSeq } = bkState;
+  let found = -1;
+  for (let i = 0; i < n; i++) {
+    if (!finish[i] && need[i].every((v, j) => v <= work[j])) { found = i; break; }
+  }
+  if (found === -1) {
+    bkState.done = true;
+    renderBankersState(); renderBankersSteps();
+    el('bankersResult').className = 'result err';
+    el('bankersResult').innerHTML = '🔴 <strong>UNSAFE STATE</strong> — no process can proceed. The system may deadlock.';
+    return;
+  }
+  for (let j = 0; j < m; j++) bkState.work[j] += alloc[found][j];
+  bkState.finish[found] = true;
+  bkState.safeSeq.push(found);
+  if (bkState.safeSeq.length === n) {
+    bkState.done = true;
+    renderBankersState(); renderBankersSteps();
+    el('bankersResult').className = 'result ok';
+    el('bankersResult').innerHTML = `✅ <strong>SAFE STATE</strong> — Safe sequence: &lt;${bkState.safeSeq.map(i => `P${i}`).join(' → ')}&gt;`;
+    return;
+  }
+  renderBankersState(); renderBankersSteps();
+  el('bankersResult').className = 'result info';
+  el('bankersResult').textContent = `Scheduled P${found}. ${n - bkState.safeSeq.length} process(es) remaining.`;
+}
+
+function bankersRunAll() {
+  if (bkState.n === 0) return;
+  for (let k = 0; k < 100; k++) { if (bkState.done) break; bankersNextStep(); }
+}
+
+function bankersReset() {
+  if (bkState.n === 0) return;
+  bkState.work = [...bkState.avail];
+  bkState.finish = Array(bkState.n).fill(false);
+  bkState.safeSeq = []; bkState.done = false;
+  bkState.need = bkState.alloc.map((row, i) => row.map((v, j) => bkState.max[i][j] - v));
+  renderBankersState(); renderBankersSteps();
+  el('bankersResult').className = 'result info';
+  el('bankersResult').textContent = 'Reset. Click Next Step to start again.';
+}
+
+function loadBankers(name) {
+  el('bankersCustom').style.display = name === 'custom' ? 'block' : 'none';
+  if (name === 'custom') { buildBankersCustom(); return; }
+  let n, m, total, alloc, max;
+  if (name === 'safe3') {
+    n = 3; m = 2; total = [5, 4];
+    alloc = [[1,1],[2,0],[0,2]]; max = [[2,2],[3,2],[2,2]];
+  } else if (name === 'unsafe') {
+    n = 3; m = 2; total = [4, 3];
+    alloc = [[2,1],[1,1],[1,0]]; max = [[3,3],[2,2],[2,2]];
+  } else if (name === 'safe5') {
+    n = 5; m = 3; total = [10, 5, 7];
+    alloc = [[0,1,0],[2,0,0],[3,0,2],[2,1,1],[0,0,2]];
+    max =   [[7,5,3],[3,2,2],[9,0,2],[2,2,2],[4,3,3]];
+  }
+  const sumAlloc = Array(m).fill(0);
+  for (let i = 0; i < n; i++) for (let j = 0; j < m; j++) sumAlloc[j] += alloc[i][j];
+  const avail = total.map((t, j) => t - sumAlloc[j]);
+  initBankers(n, m, total, alloc, max, avail);
+}
+
+// ===================== TABS =====================
+function switchTab(i) {
+  document.querySelectorAll('.tab').forEach((t, idx) => t.classList.toggle('active', idx === i));
+  document.querySelectorAll('.panel').forEach((p, idx) => p.classList.toggle('active', idx === i));
+}
+
+// ===================== INIT =====================
+buildRagInputs();
+loadBankers('safe3');
+</script>
+</body>
+</html>

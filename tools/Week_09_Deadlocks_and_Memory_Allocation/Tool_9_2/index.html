@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tool 9.2 – Memory Allocator Simulator</title>
+<style>
+  :root {
+    --navy: #0d1b2a; --navy2: #1a2e44; --orange: #ff8c00;
+    --green: #22c55e; --red: #ef4444; --blue: #3b82f6;
+    --text: #e2e8f0; --muted: #94a3b8; --border: #2d4a6a; --card: #162235;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: var(--navy); color: var(--text); min-height: 100vh; }
+  header { background: var(--navy2); border-bottom: 2px solid var(--orange); padding: 14px 24px; }
+  header h1 { font-size: 1.2rem; color: var(--orange); }
+  header span { color: var(--muted); font-size: 0.85rem; }
+  .tabs { display: flex; border-bottom: 2px solid var(--border); background: var(--navy2); flex-wrap: wrap; }
+  .tab { padding: 10px 18px; cursor: pointer; color: var(--muted); font-size: 0.85rem; border-bottom: 3px solid transparent; transition: all 0.2s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--orange); border-bottom-color: var(--orange); }
+  .panel { display: none; padding: 16px 20px; }
+  .panel.active { display: block; }
+  .explain { background: var(--card); border-left: 4px solid var(--orange); border-radius: 6px; padding: 11px 15px; margin-bottom: 16px; font-size: 0.83rem; color: var(--muted); line-height: 1.6; }
+  .explain strong { color: var(--text); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+  .card h3 { color: var(--orange); margin-bottom: 10px; font-size: 0.9rem; }
+  label { font-size: 0.81rem; color: var(--muted); display: inline-block; margin-right: 6px; }
+  input[type=text], input[type=number], select {
+    padding: 6px 10px; background: var(--navy2); border: 1px solid var(--border);
+    border-radius: 4px; color: var(--text); font-size: 0.83rem;
+  }
+  input[type=number] { width: 70px; }
+  input[type=text] { width: 120px; }
+  .btn { padding: 7px 16px; border: none; border-radius: 5px; cursor: pointer; font-size: 0.83rem; font-weight: 600; transition: opacity 0.2s; margin: 3px; }
+  .btn-orange { background: var(--orange); color: #fff; }
+  .btn-blue { background: var(--blue); color: #fff; }
+  .btn-green { background: var(--green); color: #fff; }
+  .btn-red { background: var(--red); color: #fff; }
+  .btn-grey { background: #334155; color: var(--text); }
+  .btn:hover { opacity: 0.85; }
+  .mem-strip-wrap { position: relative; height: 44px; margin: 10px 0; border-radius: 5px; overflow: hidden; border: 1px solid var(--border); background: #0a1520; }
+  .mem-block { position: absolute; top: 0; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 600; overflow: hidden; transition: all 0.4s; border-right: 1px solid rgba(255,255,255,0.1); cursor: default; }
+  .mem-block.free { background: repeating-linear-gradient(-45deg, #1e3a5f, #1e3a5f 4px, #162235 4px, #162235 8px); color: var(--muted); }
+  .mem-block.os { background: #1e3a5f; color: #60a5fa; }
+  .stats-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+  .stat-box { background: var(--navy2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 14px; font-size: 0.8rem; min-width: 140px; }
+  .stat-box .val { font-size: 1.1rem; font-weight: 700; color: var(--orange); }
+  .result { background: var(--navy2); border-radius: 6px; padding: 9px 13px; margin: 8px 0; font-size: 0.83rem; min-height: 34px; }
+  .result.ok { border-left: 4px solid var(--green); }
+  .result.err { border-left: 4px solid var(--red); }
+  .result.info { border-left: 4px solid var(--blue); }
+  .algo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+  .algo-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+  .algo-card h4 { color: var(--orange); font-size: 0.85rem; margin-bottom: 8px; }
+  .alloc-list { font-size: 0.75rem; margin-top: 6px; max-height: 120px; overflow-y: auto; }
+  .alloc-list div { padding: 2px 4px; border-bottom: 1px solid var(--border); }
+  .challenge-q { background: var(--navy2); border: 1px solid var(--orange); border-radius: 6px; padding: 12px; font-size: 0.85rem; }
+  .challenge-q pre { background: #0a1520; border-radius: 4px; padding: 8px; margin: 8px 0; font-size: 0.78rem; overflow-x: auto; }
+  .hidden { display: none; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.76rem; font-weight: 700; margin: 2px; }
+  .badge-green { background: #166534; color: #86efac; }
+  .badge-red { background: #7f1d1d; color: #fca5a5; }
+  .badge-yellow { background: #713f12; color: #fde68a; }
+  .algo-label { font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>💾 Tool 9.2 — Memory Allocator Simulator</h1>
+  <span>CS4023 Operating Systems · Week 9</span>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab(0)">Simulator</div>
+  <div class="tab" onclick="switchTab(1)">Challenge Mode</div>
+</div>
+
+<!-- TAB 0: SIMULATOR -->
+<div class="panel active" id="tab0">
+  <div class="explain">
+    <strong>Memory Allocation Strategies</strong> — given a list of free holes and a process requesting size N:
+    <strong>First Fit</strong>: allocate the first hole ≥ N (fast).
+    <strong>Best Fit</strong>: allocate the smallest hole ≥ N (minimal waste per allocation, but creates tiny remnants).
+    <strong>Worst Fit</strong>: allocate the largest hole ≥ N (leaves large remnants — performs worst in practice).
+    All three strips update simultaneously on every operation.
+  </div>
+
+  <div class="card">
+    <h3>Controls</h3>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">
+      <div>
+        <label>Process name</label><br/>
+        <input type="text" id="procName" value="P1" maxlength="6" style="width:80px" />
+      </div>
+      <div>
+        <label>Size (units)</label><br/>
+        <input type="number" id="procSize" min="1" max="400" value="80" />
+      </div>
+      <div>
+        <button class="btn btn-orange" onclick="allocate()">Allocate</button>
+        <button class="btn btn-red" onclick="openDeallocModal()">Free Process</button>
+        <button class="btn btn-blue" onclick="compact()">Compact Memory</button>
+        <button class="btn btn-grey" onclick="resetSim()">Reset</button>
+      </div>
+    </div>
+    <div id="allocResult" class="result info" style="margin-top:8px">Allocate a process to begin.</div>
+  </div>
+
+  <!-- Stats -->
+  <div class="card" style="margin-bottom:10px">
+    <h3>Statistics</h3>
+    <div class="algo-grid">
+      <div class="algo-card">
+        <h4>First Fit</h4>
+        <div class="stats-grid" id="statsFF"></div>
+      </div>
+      <div class="algo-card">
+        <h4>Best Fit</h4>
+        <div class="stats-grid" id="statsBF"></div>
+      </div>
+      <div class="algo-card">
+        <h4>Worst Fit</h4>
+        <div class="stats-grid" id="statsWF"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Memory strips -->
+  <div class="card">
+    <h3>Memory Strips (512 units total)</h3>
+    <div style="margin-bottom:4px"><div class="algo-label">First Fit</div><div class="mem-strip-wrap" id="stripFF"></div></div>
+    <div style="margin-bottom:4px"><div class="algo-label">Best Fit</div><div class="mem-strip-wrap" id="stripBF"></div></div>
+    <div style="margin-bottom:4px"><div class="algo-label">Worst Fit</div><div class="mem-strip-wrap" id="stripWF"></div></div>
+    <div style="font-size:0.72rem;color:var(--muted);margin-top:6px">
+      <span style="display:inline-block;width:16px;height:10px;background:#1e3a5f;margin-right:4px;border:1px solid var(--border)"></span>OS (fixed)
+      <span style="margin-left:12px;display:inline-block;width:16px;height:10px;background:repeating-linear-gradient(-45deg,#1e3a5f,#1e3a5f 4px,#162235 4px,#162235 8px);margin-right:4px;border:1px solid var(--border)"></span>Free
+    </div>
+  </div>
+
+  <!-- Dealloc modal -->
+  <div id="deallocModal" class="hidden card" style="border:2px solid var(--orange)">
+    <h3>Free a Process</h3>
+    <select id="deallocSelect" style="width:180px;margin-right:8px"></select>
+    <button class="btn btn-red" onclick="deallocate()">Free Selected</button>
+    <button class="btn btn-grey" onclick="el('deallocModal').classList.add('hidden')">Cancel</button>
+  </div>
+</div>
+
+<!-- TAB 1: CHALLENGE -->
+<div class="panel" id="tab1">
+  <div class="explain">
+    <strong>Challenge Mode</strong> — a specific allocation sequence is pre-loaded. Work through it, then predict which
+    algorithm (First Fit, Best Fit, Worst Fit) <em>fails</em> on the final request. Submit your answer to see the analysis.
+  </div>
+
+  <div class="challenge-q">
+    <strong>Scenario:</strong> Memory = 512 units. OS occupies the first 100 units (fixed).
+    <pre>Step 1: allocate P1 (size 80)
+Step 2: allocate P2 (size 60)
+Step 3: allocate P3 (size 100)
+Step 4: free P1  → leaves hole of size 80 at position 100
+Step 5: free P2  → leaves hole of size 60 at position 180
+Step 6: allocate P4 (size 90)  ← WHICH ALGORITHM SUCCEEDS?</pre>
+    <p style="margin-bottom:10px">After freeing P1 and P2: two non-contiguous holes of 80 and 60 units. P4 needs 90 units.</p>
+
+    <div style="margin-bottom:10px">
+      <strong>Your prediction:</strong>
+      <label><input type="checkbox" id="chFF" /> First Fit succeeds</label> &nbsp;
+      <label><input type="checkbox" id="chBF" /> Best Fit succeeds</label> &nbsp;
+      <label><input type="checkbox" id="chWF" /> Worst Fit succeeds</label>
+    </div>
+    <button class="btn btn-orange" onclick="checkChallenge()">Check Answer</button>
+    <button class="btn btn-blue" onclick="runChallenge()">Run Simulation</button>
+    <div id="challengeResult" class="result info" style="margin-top:10px">Select your predictions and click Check Answer.</div>
+  </div>
+
+  <!-- Challenge visual strips -->
+  <div id="challengeStrips" class="hidden" style="margin-top:14px">
+    <div class="card">
+      <h3>Challenge Simulation</h3>
+      <div class="algo-grid" id="challengeAlgoCards"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+function el(id) { return document.getElementById(id); }
+
+const MEM_SIZE = 512;
+const OS_SIZE = 100;
+
+// Process colour pool
+const COLOURS = ['#2563eb','#7c3aed','#db2777','#0891b2','#059669','#d97706','#dc2626','#65a30d','#9333ea','#0284c7'];
+let colourIdx = 0;
+function nextColour() { const c = COLOURS[colourIdx % COLOURS.length]; colourIdx++; return c; }
+
+// State for each algorithm: array of segments {name, start, size, colour, isFree, isOS}
+function freshState() {
+  return [{ name: 'OS', start: 0, size: OS_SIZE, colour: '#1e3a5f', isFree: false, isOS: true },
+          { name: 'free', start: OS_SIZE, size: MEM_SIZE - OS_SIZE, colour: null, isFree: true, isOS: false }];
+}
+
+let states = { FF: freshState(), BF: freshState(), WF: freshState() };
+let processColours = {};
+
+function allocate() {
+  const name = el('procName').value.trim() || 'P?';
+  const size = parseInt(el('procSize').value);
+  if (!size || size < 1 || size > MEM_SIZE - OS_SIZE) {
+    setResult('err', `Invalid size. Must be 1–${MEM_SIZE - OS_SIZE}.`);
+    return;
+  }
+  if (!processColours[name]) processColours[name] = nextColour();
+  const colour = processColours[name];
+
+  const results = {};
+  ['FF', 'BF', 'WF'].forEach(algo => {
+    results[algo] = allocateInState(states[algo], name, size, colour, algo);
+  });
+
+  const msgs = [];
+  ['FF', 'BF', 'WF'].forEach(algo => {
+    const label = { FF: 'First Fit', BF: 'Best Fit', WF: 'Worst Fit' }[algo];
+    msgs.push(`${label}: ${results[algo] ? `✅ @${results[algo]}` : '❌ FAIL'}`);
+  });
+
+  const anyFail = Object.values(results).some(r => !r);
+  setResult(anyFail ? 'err' : 'ok', `Allocate ${name}(${size}) → ${msgs.join('  |  ')}`);
+  renderAll();
+}
+
+function allocateInState(segs, name, size, colour, algo) {
+  const holes = segs.filter(s => s.isFree && s.size >= size);
+  if (holes.length === 0) return null;
+  let chosen;
+  if (algo === 'FF') chosen = holes.sort((a, b) => a.start - b.start)[0];
+  else if (algo === 'BF') chosen = holes.sort((a, b) => a.size - b.size)[0];
+  else chosen = holes.sort((a, b) => b.size - a.size)[0];
+
+  const idx = segs.indexOf(chosen);
+  const pos = chosen.start;
+  const remainder = chosen.size - size;
+  const newBlock = { name, start: pos, size, colour, isFree: false, isOS: false };
+  if (remainder > 0) {
+    segs.splice(idx, 1, newBlock, { name: 'free', start: pos + size, size: remainder, colour: null, isFree: true, isOS: false });
+  } else {
+    segs.splice(idx, 1, newBlock);
+  }
+  return pos;
+}
+
+function openDeallocModal() {
+  // Get list of named processes (non-free, non-OS) from FF state
+  const procs = [...new Set(states.FF.filter(s => !s.isFree && !s.isOS).map(s => s.name))];
+  if (procs.length === 0) { setResult('info', 'No processes to free.'); return; }
+  el('deallocSelect').innerHTML = procs.map(p => `<option value="${p}">${p}</option>`).join('');
+  el('deallocModal').classList.remove('hidden');
+}
+
+function deallocate() {
+  const name = el('deallocSelect').value;
+  ['FF', 'BF', 'WF'].forEach(algo => freeProcess(states[algo], name));
+  el('deallocModal').classList.add('hidden');
+  setResult('info', `Freed ${name} in all three algorithms. Adjacent free holes coalesced.`);
+  renderAll();
+}
+
+function freeProcess(segs, name) {
+  for (let i = 0; i < segs.length; i++) {
+    if (segs[i].name === name && !segs[i].isFree) {
+      segs[i] = { name: 'free', start: segs[i].start, size: segs[i].size, colour: null, isFree: true, isOS: false };
+    }
+  }
+  coalesce(segs);
+}
+
+function coalesce(segs) {
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let i = 0; i < segs.length - 1; i++) {
+      if (segs[i].isFree && segs[i + 1].isFree) {
+        segs[i] = { name: 'free', start: segs[i].start, size: segs[i].size + segs[i+1].size, colour: null, isFree: true, isOS: false };
+        segs.splice(i + 1, 1);
+        changed = true; break;
+      }
+    }
+  }
+}
+
+function compact() {
+  ['FF', 'BF', 'WF'].forEach(algo => compactState(states[algo]));
+  setResult('ok', 'Compaction complete — all free space consolidated at the end.');
+  renderAll();
+}
+
+function compactState(segs) {
+  const os = segs.find(s => s.isOS);
+  const procs = segs.filter(s => !s.isFree && !s.isOS);
+  const totalFree = segs.filter(s => s.isFree).reduce((acc, s) => acc + s.size, 0);
+  let pos = OS_SIZE;
+  const newSegs = [os];
+  for (const p of procs) { newSegs.push({ ...p, start: pos }); pos += p.size; }
+  if (totalFree > 0) newSegs.push({ name: 'free', start: pos, size: totalFree, colour: null, isFree: true, isOS: false });
+  segs.length = 0; segs.push(...newSegs);
+}
+
+function resetSim() {
+  states = { FF: freshState(), BF: freshState(), WF: freshState() };
+  processColours = {}; colourIdx = 0;
+  setResult('info', 'Memory reset.');
+  renderAll();
+}
+
+function computeStats(segs) {
+  const freeSegs = segs.filter(s => s.isFree);
+  const totalFree = freeSegs.reduce((acc, s) => acc + s.size, 0);
+  const numHoles = freeSegs.length;
+  const largestHole = freeSegs.length ? Math.max(...freeSegs.map(s => s.size)) : 0;
+  const extFrag = totalFree > 0 ? Math.round((totalFree - largestHole) / totalFree * 100) : 0;
+  return { totalFree, numHoles, largestHole, extFrag };
+}
+
+function renderStrip(containerId, segs) {
+  const container = el(containerId);
+  container.innerHTML = '';
+  for (const seg of segs) {
+    const div = document.createElement('div');
+    div.className = 'mem-block' + (seg.isFree ? ' free' : (seg.isOS ? ' os' : ''));
+    div.style.left = `${(seg.start / MEM_SIZE) * 100}%`;
+    div.style.width = `${(seg.size / MEM_SIZE) * 100}%`;
+    if (!seg.isFree) div.style.background = seg.colour;
+    div.title = seg.isFree ? `Free: ${seg.size} units @${seg.start}` : `${seg.name}: ${seg.size} units @${seg.start}`;
+    if (seg.size / MEM_SIZE > 0.06) div.textContent = seg.isFree ? `${seg.size}` : `${seg.name}(${seg.size})`;
+    container.appendChild(div);
+  }
+}
+
+function renderStats(containerId, stats) {
+  el(containerId).innerHTML = `
+    <div class="stat-box"><div class="val">${stats.totalFree}</div><div>Free units</div></div>
+    <div class="stat-box"><div class="val">${stats.numHoles}</div><div>Free holes</div></div>
+    <div class="stat-box"><div class="val">${stats.largestHole}</div><div>Largest hole</div></div>
+    <div class="stat-box"><div class="val" style="color:${stats.extFrag > 40 ? 'var(--red)' : 'var(--orange)'}">${stats.extFrag}%</div><div>Ext. fragmentation</div></div>
+  `;
+}
+
+function renderAll() {
+  ['FF', 'BF', 'WF'].forEach(algo => {
+    renderStrip(`strip${algo}`, states[algo]);
+    renderStats(`stats${algo}`, computeStats(states[algo]));
+  });
+}
+
+function setResult(type, msg) {
+  const r = el('allocResult');
+  r.className = `result ${type}`;
+  r.textContent = msg;
+}
+
+// ===================== CHALLENGE =====================
+function checkChallenge() {
+  // Answer: both FF and BF and WF all FAIL — neither hole (80, 60) fits P4(90)
+  const ff = el('chFF').checked, bf = el('chBF').checked, wf = el('chWF').checked;
+  const correct = !ff && !bf && !wf;
+  const res = el('challengeResult');
+  if (correct) {
+    res.className = 'result ok';
+    res.innerHTML = `✅ <strong>Correct!</strong> All three algorithms FAIL — neither the 80-unit hole nor the 60-unit hole is large enough for P4 (90 units). Total free = 140 units, but it is split into non-contiguous holes. External fragmentation prevents allocation. <strong>Compaction</strong> would merge the holes into a single 140-unit block, allowing P4 to fit.`;
+  } else {
+    res.className = 'result err';
+    res.innerHTML = `❌ Not quite. <strong>All algorithms fail here</strong> — P4 needs 90 units but the two free holes are 80 and 60 (neither is large enough). Total free = 140 but it is fragmented. <em>This is classic external fragmentation.</em>`;
+  }
+}
+
+function runChallenge() {
+  el('challengeStrips').classList.remove('hidden');
+  // Build the sequence: OS(100), P1(80), P2(60), P3(100), free P1, free P2, try P4(90)
+  const cStates = { FF: freshState(), BF: freshState(), WF: freshState() };
+  const colours = { P1: '#2563eb', P2: '#7c3aed', P3: '#059669', P4: '#dc2626' };
+  const ops = [
+    { op: 'alloc', name: 'P1', size: 80 },
+    { op: 'alloc', name: 'P2', size: 60 },
+    { op: 'alloc', name: 'P3', size: 100 },
+    { op: 'free', name: 'P1' },
+    { op: 'free', name: 'P2' },
+    { op: 'alloc', name: 'P4', size: 90 },
+  ];
+  ops.forEach(op => {
+    ['FF', 'BF', 'WF'].forEach(algo => {
+      if (op.op === 'alloc') allocateInState(cStates[algo], op.name, op.size, colours[op.name], algo);
+      else if (op.op === 'free') freeProcess(cStates[algo], op.name);
+    });
+  });
+
+  let html = '';
+  ['FF', 'BF', 'WF'].forEach((algo, i) => {
+    const label = ['First Fit', 'Best Fit', 'Worst Fit'][i];
+    const stats = computeStats(cStates[algo]);
+    const strips = cStates[algo].map(s => `<div style="position:absolute;top:0;height:100%;left:${(s.start/MEM_SIZE)*100}%;width:${(s.size/MEM_SIZE)*100}%;background:${s.isFree ? 'repeating-linear-gradient(-45deg,#1e3a5f,#1e3a5f 4px,#162235 4px,#162235 8px)' : (s.isOS ? '#1e3a5f' : colours[s.name] || '#666')};border-right:1px solid rgba(255,255,255,0.1);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:600;color:${s.isFree ? 'var(--muted)' : '#fff'}">${s.size > 30 ? (s.isFree ? s.size : s.name + '(' + s.size + ')') : ''}</div>`).join('');
+    const p4result = cStates[algo].some(s => s.name === 'P4') ? '<span class="badge badge-red">P4 FAILED</span>' : '<span class="badge badge-red">P4 FAILED</span>';
+    // P4 always fails — check
+    const p4placed = cStates[algo].some(s => s.name === 'P4');
+    html += `<div class="algo-card"><h4>${label} ${p4placed ? '<span class="badge badge-green">P4 OK</span>' : '<span class="badge badge-red">P4 FAILED</span>'}</h4>
+      <div class="mem-strip-wrap" style="height:36px">${strips}</div>
+      <div style="font-size:0.72rem;color:var(--muted);margin-top:4px">Free holes: ${stats.numHoles} | Largest: ${stats.largestHole} | Ext.frag: ${stats.extFrag}%</div>
+    </div>`;
+  });
+  el('challengeAlgoCards').innerHTML = html;
+  el('challengeResult').className = 'result info';
+  el('challengeResult').textContent = 'Simulation run. Notice that P4(90) cannot fit in any hole — external fragmentation at work.';
+}
+
+// ===================== TABS =====================
+function switchTab(i) {
+  document.querySelectorAll('.tab').forEach((t, idx) => t.classList.toggle('active', idx === i));
+  document.querySelectorAll('.panel').forEach((p, idx) => p.classList.toggle('active', idx === i));
+}
+
+// Init
+renderAll();
+</script>
+</body>
+</html>
