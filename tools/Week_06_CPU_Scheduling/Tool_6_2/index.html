@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tool 6.2 — Round Robin Quantum Explorer & CFS Demo</title>
+<style>
+  :root {
+    --navy: #002147; --gold: #d4a017; --bg: #0f1117; --surface: #1a1e2e;
+    --border: #2a3050; --text: #e2e8f0; --muted: #94a3b8;
+    --green: #4ade80; --red: #f87171; --yellow: #fbbf24; --blue: #60a5fa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; }
+  header { background: var(--navy); padding: 16px 24px; border-bottom: 3px solid var(--gold); }
+  header h1 { font-size: 1.15rem; color: var(--gold); font-weight: 700; }
+  header p { color: #94a3b8; font-size: 0.8rem; margin-top: 2px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+  section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 18px; }
+  section h2 { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold); margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #252a3d; color: var(--muted); font-size: 0.78rem; text-transform: uppercase; padding: 6px 10px; text-align: center; }
+  td { padding: 6px 6px; text-align: center; border-bottom: 1px solid var(--border); }
+  input[type=text], input[type=number] { background: #252a3d; border: 1px solid var(--border); color: var(--text); border-radius: 4px; padding: 4px 8px; width: 60px; text-align: center; font-size: 0.88rem; }
+  .btn { border: none; border-radius: 6px; padding: 8px 18px; font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: opacity .15s; }
+  .btn:hover { opacity: .85; }
+  .btn-primary { background: var(--gold); color: var(--navy); }
+  .btn-secondary { background: #2a3050; color: var(--text); }
+  .btn-sm { padding: 4px 10px; font-size: 0.78rem; }
+  /* Slider */
+  .slider-wrap { display: flex; align-items: center; gap: 16px; margin-top: 8px; }
+  .slider-wrap label { color: var(--gold); font-weight: 700; font-size: 1.1rem; min-width: 130px; }
+  #quantum-val { font-size: 2rem; font-weight: 900; color: var(--gold); min-width: 48px; }
+  input[type=range] {
+    -webkit-appearance: none; appearance: none; height: 10px; border-radius: 5px;
+    background: linear-gradient(to right, var(--gold) 0%, var(--gold) var(--fill, 20%), #252a3d var(--fill, 20%), #252a3d 100%);
+    flex: 1; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; border-radius: 50%; background: var(--gold); cursor: pointer; box-shadow: 0 0 6px rgba(212,160,23,.6); }
+  /* Stats */
+  .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-top: 10px; }
+  .stat { background: #252a3d; border-radius: 6px; padding: 10px 14px; }
+  .stat .label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; }
+  .stat .val { font-size: 1.4rem; font-weight: 700; color: var(--gold); }
+  /* Banner */
+  .banner { border-radius: 6px; padding: 8px 14px; font-size: 0.82rem; font-weight: 600; margin-bottom: 10px; display: none; }
+  .banner-red    { background: #450a0a; color: var(--red); border: 1px solid #7f1d1d; }
+  .banner-yellow { background: #451a03; color: var(--yellow); border: 1px solid #92400e; }
+  .banner-green  { background: #052e16; color: var(--green); border: 1px solid #14532d; }
+  /* CFS panel */
+  #cfs-panel { background: #111827; }
+  .cfs-process { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .cfs-process .name { width: 32px; font-weight: 700; }
+  .cfs-bar-wrap { flex: 1; height: 22px; background: #1f2937; border-radius: 4px; overflow: hidden; }
+  .cfs-bar { height: 100%; transition: width .3s; border-radius: 4px; }
+  .cfs-vrt { width: 90px; text-align: right; font-family: monospace; font-size: 0.82rem; color: var(--muted); }
+  .cfs-running { color: var(--green); font-weight: 700; font-size: 0.72rem; margin-left: 6px; }
+  .nice-input { width: 50px !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Tool 6.2 — Round Robin Quantum Explorer &amp; CFS Demo</h1>
+  <p>CS4023 Operating Systems · University of Limerick · Week 6</p>
+</header>
+<div class="container">
+
+  <!-- Processes -->
+  <section>
+    <h2>Process Set</h2>
+    <table id="proc-table">
+      <thead><tr><th>#</th><th>Name</th><th>Arrival</th><th>Burst</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn btn-secondary btn-sm" onclick="addRow()">+ Add</button>
+      <button class="btn btn-secondary btn-sm" onclick="removeRow()">− Remove</button>
+      <button class="btn btn-secondary btn-sm" onclick="loadDefault()">Load Default</button>
+    </div>
+  </section>
+
+  <!-- Quantum Slider -->
+  <section>
+    <h2>Time Quantum</h2>
+    <div class="slider-wrap">
+      <label>Quantum (q):</label>
+      <span id="quantum-val">3</span>
+      <input type="range" id="quantum-slider" min="1" max="15" step="1" value="3" oninput="onSlider(this)">
+      <span style="color:var(--muted);font-size:0.8rem">1 ms ← slider → 15 ms</span>
+    </div>
+    <!-- Banners -->
+    <div class="banner banner-red"    id="banner-red">⚠ Very small quantum: context switch overhead may exceed useful work</div>
+    <div class="banner banner-yellow" id="banner-yellow">⚡ Large quantum: Round Robin degenerates to FCFS</div>
+    <div class="banner banner-green"  id="banner-green">✓ Balanced: good throughput with reasonable response time</div>
+  </section>
+
+  <!-- Gantt -->
+  <section>
+    <h2>Round Robin Gantt Chart</h2>
+    <div style="overflow-x:auto"><canvas id="gantt-canvas"></canvas></div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:10px;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;color:var(--muted);">
+        <input type="checkbox" id="anim-check"> Animate (300ms/segment)
+      </label>
+      <button class="btn btn-secondary btn-sm" onclick="runAnimate()" id="anim-btn">▶ Play</button>
+    </div>
+  </section>
+
+  <!-- Stats -->
+  <section>
+    <h2>Statistics</h2>
+    <div class="stats-row">
+      <div class="stat"><div class="label">Avg Waiting Time</div><div class="val" id="s-awt">—</div><div style="font-size:.7rem;color:var(--muted)">ms</div></div>
+      <div class="stat"><div class="label">Avg Turnaround</div><div class="val" id="s-atat">—</div><div style="font-size:.7rem;color:var(--muted)">ms</div></div>
+      <div class="stat"><div class="label">Context Switches</div><div class="val" id="s-cs">—</div></div>
+      <div class="stat"><div class="label">Est. Overhead</div><div class="val" id="s-oh">—</div><div style="font-size:.7rem;color:var(--muted)">assumes 0.1ms/switch</div></div>
+    </div>
+  </section>
+
+  <!-- CFS Panel -->
+  <section id="cfs-panel">
+    <h2>CFS — Virtual Runtime Demo</h2>
+    <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px">
+      CFS always schedules the process with the <strong>lowest virtual runtime</strong>. 
+      Nice values adjust how fast vruntime grows (lower nice → slower growth → more CPU).
+    </p>
+    <table style="width:100%;margin-bottom:12px;">
+      <thead><tr><th>Process</th><th>Nice Value (−20…+19)</th><th>Weight</th></tr></thead>
+      <tbody id="nice-table"></tbody>
+    </table>
+    <div id="cfs-bars" style="margin-bottom:12px;"></div>
+    <div style="font-size:.8rem;color:var(--muted);margin-bottom:10px" id="cfs-status">Press Step to advance one scheduling tick.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary btn-sm" onclick="cfsStep()">Step ▶</button>
+      <button class="btn btn-secondary btn-sm" onclick="cfsReset()">Reset</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+const COLORS = ['#4a90d9','#e8734a','#6abf69','#9c6bca','#e8b84a','#4ab8b8'];
+const DEFAULT = [{name:'P1',arrival:0,burst:8},{name:'P2',arrival:1,burst:4},{name:'P3',arrival:2,burst:9},{name:'P4',arrival:3,burst:5}];
+
+// nice → weight (simplified Linux weight table)
+function niceToWeight(nice) {
+  const table = {
+    '-20':88761,'-19':71755,'-18':56483,'-17':46273,'-16':36291,
+    '-15':29154,'-14':23254,'-13':18705,'-12':14949,'-11':11916,
+    '-10':9548, '-9':7620,  '-8':6100,  '-7':4904,  '-6':3906,
+    '-5':3121,  '-4':2501,  '-3':1991,  '-2':1586,  '-1':1277,
+    '0':1024,   '1':820,    '2':655,    '3':526,    '4':423,
+    '5':335,    '6':272,    '7':215,    '8':172,    '9':137,
+    '10':110,   '11':87,    '12':70,    '13':56,    '14':45,
+    '15':36,    '16':29,    '17':23,    '18':18,    '19':15,
+  };
+  return table[String(nice)] || 1024;
+}
+
+const NICE0_WEIGHT = 1024;
+
+// ── Table ──────────────────────────────────────────────────
+function addRow(p={name:`P${document.querySelectorAll('#proc-table tbody tr').length+1}`,arrival:0,burst:1}) {
+  const tbody = document.querySelector('#proc-table tbody');
+  const idx = tbody.children.length+1;
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td style="color:var(--muted)">${idx}</td>
+    <td><input type="text" value="${p.name}" style="width:50px" oninput="rebuild()"></td>
+    <td><input type="number" value="${p.arrival}" min="0" oninput="rebuild()"></td>
+    <td><input type="number" value="${p.burst}" min="1" oninput="rebuild()"></td>`;
+  tbody.appendChild(tr);
+}
+function removeRow(){
+  const tbody=document.querySelector('#proc-table tbody');
+  if(tbody.children.length>1){tbody.removeChild(tbody.lastChild);rebuild();}
+}
+function loadDefault(){
+  document.querySelector('#proc-table tbody').innerHTML='';
+  DEFAULT.forEach(p=>addRow(p));
+  rebuild();
+}
+function getProcesses(){
+  return Array.from(document.querySelectorAll('#proc-table tbody tr')).map(r=>{
+    const c=r.querySelectorAll('input');
+    return {name:c[0].value.trim()||'P?', arrival:parseInt(c[1].value)||0, burst:parseInt(c[2].value)||1};
+  }).filter(p=>p.burst>0);
+}
+
+// ── RR Scheduler ──────────────────────────────────────────
+function scheduleRR(procs, q) {
+  const rem = procs.map(p=>p.burst);
+  let t=0, segs=[], queue=[], added=new Array(procs.length).fill(false);
+  // add processes that arrive at t=0
+  for(let i=0;i<procs.length;i++) if(procs[i].arrival<=0){queue.push(i);added[i]=true;}
+  let done=0;
+  while(done<procs.length){
+    if(!queue.length){
+      // advance to next arrival
+      let nextArr=Infinity;
+      for(let i=0;i<procs.length;i++) if(!added[i]) nextArr=Math.min(nextArr,procs[i].arrival);
+      t=nextArr;
+      for(let i=0;i<procs.length;i++) if(!added[i]&&procs[i].arrival<=t){queue.push(i);added[i]=true;}
+      continue;
+    }
+    const idx=queue.shift();
+    const run=Math.min(q, rem[idx]);
+    segs.push({proc:procs[idx],start:t,end:t+run,pidx:idx});
+    t+=run; rem[idx]-=run;
+    // enqueue newly arrived during this slice
+    for(let i=0;i<procs.length;i++) if(!added[i]&&procs[i].arrival<=t){queue.push(i);added[i]=true;}
+    if(rem[idx]>0) queue.push(idx);
+    else done++;
+  }
+  return segs;
+}
+
+function computeStats(procs, segs){
+  const finish={}, firstSeg={};
+  for(const s of segs){
+    const n=s.proc.name;
+    if(finish[n]===undefined||s.end>finish[n]) finish[n]=s.end;
+  }
+  let tw=0,tt=0,cs=segs.length-1;
+  for(const p of procs){
+    const tat=finish[p.name]-p.arrival;
+    const w=tat-p.burst;
+    tw+=w; tt+=tat;
+  }
+  const totalTime=Math.max(...segs.map(s=>s.end));
+  const overhead=cs>0?(cs*0.1/totalTime*100):0;
+  return {awt:tw/procs.length, atat:tt/procs.length, cs, overhead};
+}
+
+// ── Draw Gantt ────────────────────────────────────────────
+function drawGantt(procs, segs, count){
+  if(!segs.length) return;
+  const tMax=Math.max(...segs.map(s=>s.end));
+  const SCALE=Math.min(28,900/(tMax+1)), PAD=20, BAR_H=38, TICK_H=20;
+  const W=PAD*2+tMax*SCALE, H=BAR_H+TICK_H+PAD*2;
+  const canvas=document.getElementById('gantt-canvas');
+  canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  const pidx={};
+  procs.forEach((p,i)=>pidx[p.name]=i);
+  const barY=PAD;
+  const vis=segs.slice(0,count);
+  for(const s of vis){
+    const x=PAD+s.start*SCALE, w=(s.end-s.start)*SCALE;
+    ctx.fillStyle=COLORS[pidx[s.proc.name]%COLORS.length];
+    ctx.fillRect(x,barY,w,BAR_H);
+    ctx.strokeStyle='#0f1117'; ctx.lineWidth=1; ctx.strokeRect(x,barY,w,BAR_H);
+    ctx.fillStyle='#fff'; ctx.font='bold 12px Segoe UI,sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    if(w>14) ctx.fillText(s.proc.name,x+w/2,barY+BAR_H/2);
+  }
+  // ticks
+  const ticks=new Set([0]);
+  for(const s of segs){ticks.add(s.start);ticks.add(s.end);}
+  const tickY=barY+BAR_H;
+  ctx.strokeStyle='#4a5568'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(PAD,tickY); ctx.lineTo(PAD+tMax*SCALE,tickY); ctx.stroke();
+  ctx.fillStyle='#94a3b8'; ctx.font='11px Segoe UI,sans-serif'; ctx.textAlign='center';
+  for(const t of ticks){
+    const x=PAD+t*SCALE;
+    ctx.beginPath(); ctx.moveTo(x,tickY); ctx.lineTo(x,tickY+6); ctx.stroke();
+    ctx.fillText(t,x,tickY+16);
+  }
+}
+
+// ── Update slider fill ────────────────────────────────────
+function updateSliderFill(slider){
+  const pct=((slider.value-slider.min)/(slider.max-slider.min)*100)+'%';
+  slider.style.setProperty('--fill',pct);
+}
+
+let currentSegs=[];
+let animTimer2=null;
+
+function rebuild(){
+  if(animTimer2){clearInterval(animTimer2);animTimer2=null;}
+  const procs=getProcesses();
+  if(!procs.length) return;
+  const q=parseInt(document.getElementById('quantum-slider').value);
+  currentSegs=scheduleRR(procs,q);
+  drawGantt(procs,currentSegs,currentSegs.length);
+  const st=computeStats(procs,currentSegs);
+  document.getElementById('s-awt').textContent=st.awt.toFixed(2);
+  document.getElementById('s-atat').textContent=st.atat.toFixed(2);
+  document.getElementById('s-cs').textContent=st.cs;
+  document.getElementById('s-oh').textContent=st.overhead.toFixed(1)+'%';
+  // banners
+  const maxBurst=Math.max(...procs.map(p=>p.burst));
+  document.getElementById('banner-red').style.display    = q<=2 ? 'block':'none';
+  document.getElementById('banner-yellow').style.display = q>=maxBurst ? 'block':'none';
+  document.getElementById('banner-green').style.display  = (q>=4&&q<=6&&q<maxBurst&&q>2) ? 'block':'none';
+  // update nice table names
+  refreshNiceTable(procs);
+}
+
+function onSlider(el){
+  document.getElementById('quantum-val').textContent=el.value;
+  updateSliderFill(el);
+  rebuild();
+}
+
+function runAnimate(){
+  if(animTimer2){clearInterval(animTimer2);animTimer2=null;}
+  const procs=getProcesses();
+  let i=0;
+  animTimer2=setInterval(()=>{
+    i++;
+    drawGantt(procs,currentSegs,i);
+    if(i>=currentSegs.length){clearInterval(animTimer2);animTimer2=null;}
+  },300);
+}
+
+// ── CFS Demo ──────────────────────────────────────────────
+const CFS_TICK_NS = 6000000; // 6ms target latency in ns
+let cfsState = {processes:[], vruntimes:[], running:-1, tick:0};
+
+function refreshNiceTable(procs){
+  const tbody=document.getElementById('nice-table');
+  const existing=Array.from(tbody.querySelectorAll('input[data-nice]'));
+  const savedNice={};
+  existing.forEach(el=>savedNice[el.dataset.proc]=parseInt(el.value)||0);
+  tbody.innerHTML='';
+  procs.forEach((p,i)=>{
+    const nice=savedNice[p.name]!==undefined?savedNice[p.name]:0;
+    const w=niceToWeight(nice);
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td style="color:${COLORS[i%COLORS.length]};font-weight:700">${p.name}</td>
+      <td><input type="number" class="nice-input" data-nice data-proc="${p.name}" value="${nice}" min="-20" max="19" oninput="cfsReset()"></td>
+      <td id="cfs-w-${p.name}" style="color:var(--muted)">${w}</td>`;
+    tbody.appendChild(tr);
+  });
+  cfsReset();
+}
+
+function getNiceValues(){
+  const nv={};
+  document.querySelectorAll('#nice-table input[data-nice]').forEach(el=>{
+    nv[el.dataset.proc]=parseInt(el.value)||0;
+  });
+  return nv;
+}
+
+function cfsReset(){
+  const procs=getProcesses();
+  const nv=getNiceValues();
+  cfsState.processes=procs;
+  cfsState.vruntimes=procs.map(()=>0);
+  cfsState.running=-1;
+  cfsState.tick=0;
+  // update weight display
+  procs.forEach(p=>{
+    const nice=nv[p.name]||0;
+    const w=niceToWeight(nice);
+    const el=document.getElementById(`cfs-w-${p.name}`);
+    if(el) el.textContent=w;
+  });
+  renderCfsBars(-1);
+  document.getElementById('cfs-status').textContent='Reset. Press Step to advance one scheduling tick (6 ms target latency slice).';
+}
+
+function cfsStep(){
+  const procs=cfsState.processes;
+  if(!procs.length) return;
+  const nv=getNiceValues();
+  const weights=procs.map(p=>niceToWeight(nv[p.name]||0));
+  const totalW=weights.reduce((a,b)=>a+b,0);
+  // pick process with smallest vruntime
+  let minV=Infinity, best=-1;
+  for(let i=0;i<procs.length;i++){
+    if(cfsState.vruntimes[i]<minV){minV=cfsState.vruntimes[i];best=i;}
+  }
+  // compute time slice for this process
+  const slice=Math.round(CFS_TICK_NS*(weights[best]/totalW));
+  // advance vruntime: delta_vruntime = slice * (NICE0_WEIGHT / weight)
+  const deltaV=Math.round(slice*(NICE0_WEIGHT/weights[best]));
+  cfsState.vruntimes[best]+=deltaV;
+  cfsState.running=best;
+  cfsState.tick++;
+  renderCfsBars(best);
+  const sliceMs=(slice/1e6).toFixed(2);
+  document.getElementById('cfs-status').textContent=
+    `Tick ${cfsState.tick}: Scheduled ${procs[best].name} (lowest vruntime). Slice = ${sliceMs} ms. ΔvRT = ${deltaV.toLocaleString()} ns. New vruntime = ${cfsState.vruntimes[best].toLocaleString()} ns.`;
+}
+
+function renderCfsBars(running){
+  const procs=cfsState.processes;
+  const vts=cfsState.vruntimes;
+  const container=document.getElementById('cfs-bars');
+  container.innerHTML='';
+  const maxV=Math.max(...vts,1);
+  procs.forEach((p,i)=>{
+    const pct=Math.round(vts[i]/maxV*100);
+    const isRun=i===running;
+    const div=document.createElement('div');
+    div.className='cfs-process';
+    div.innerHTML=`<span class="name" style="color:${COLORS[i%COLORS.length]}">${p.name}</span>
+      <div class="cfs-bar-wrap">
+        <div class="cfs-bar" style="width:${pct}%;background:${isRun?'#4ade80':COLORS[i%COLORS.length]}"></div>
+      </div>
+      <span class="cfs-vrt">${(vts[i]/1e6).toFixed(1)} ms</span>
+      ${isRun?'<span class="cfs-running">▶ RUNNING</span>':''}`;
+    container.appendChild(div);
+  });
+}
+
+// ── Init ──────────────────────────────────────────────────
+loadDefault();
+updateSliderFill(document.getElementById('quantum-slider'));
+</script>
+</body>
+</html>
