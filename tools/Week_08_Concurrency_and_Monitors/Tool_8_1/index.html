@@ -69,6 +69,26 @@
   .op-post{color:#34d399}
   .op-deadlock{color:#ef4444}
   .trace-entry .ts{color:#475569;margin-right:6px}
+  /* Explanation panel */
+  .explain-panel{margin-top:16px;background:#1e293b;border:1px solid #334155;border-radius:10px;overflow:hidden}
+  .explain-toggle{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;cursor:pointer;user-select:none;font-size:0.82rem;font-weight:700;color:#94a3b8;letter-spacing:.04em}
+  .explain-toggle:hover{background:#263044}
+  .explain-toggle .arrow{transition:transform .2s;font-size:0.7rem}
+  .explain-toggle.open .arrow{transform:rotate(180deg)}
+  .explain-body{display:none;padding:12px 16px 14px;border-top:1px solid #334155}
+  .explain-body.open{display:block}
+  .explain-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:12px}
+  .explain-card{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px}
+  .explain-card h4{font-size:0.75rem;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
+  .explain-card p{font-size:0.78rem;color:#94a3b8;line-height:1.5}
+  .explain-card code{font-family:'Courier New',monospace;color:#93c5fd;font-size:0.76rem}
+  .explain-modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+  .mode-desc{background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 12px;font-size:0.78rem;color:#94a3b8;line-height:1.5}
+  .mode-desc strong{display:block;margin-bottom:2px}
+  .mode-normal strong{color:#3b82f6}
+  .mode-deadlock strong{color:#ef4444}
+  .mode-starvation strong{color:#f59e0b}
+  .mode-nosync strong{color:#f59e0b}
 </style>
 </head>
 <body>
@@ -155,7 +175,50 @@
   <!-- Trace -->
   <div style="font-size:0.75rem;color:#64748b;margin-bottom:4px">Trace Log</div>
   <div class="trace-area" id="traceLog"></div>
+
+  <!-- Explanation panel -->
+  <div class="explain-panel">
+    <div class="explain-toggle" id="explainToggle" onclick="toggleExplain()">
+      <span>&#9432; How this visualiser works</span>
+      <span class="arrow">&#9660;</span>
+    </div>
+    <div class="explain-body" id="explainBody">
+      <p style="font-size:0.82rem;color:#cbd5e1;margin-bottom:12px;line-height:1.5">
+        The Bounded Buffer problem is one of the classic concurrency problems. A shared circular buffer of size N is accessed by producer threads (which add items) and consumer threads (which remove items). Without synchronisation, producers can overwrite unread data, and consumers can read empty slots. Three semaphores enforce correct access:
+      </p>
+      <div class="explain-grid">
+        <div class="explain-card">
+          <h4 style="color:#34d399">empty semaphore</h4>
+          <p>Initialised to <code>N</code> (all slots empty). A producer calls <code>P(empty)</code> before inserting — this blocks when the buffer is full. A consumer calls <code>V(empty)</code> after removing, signalling that a slot is free again.</p>
+        </div>
+        <div class="explain-card">
+          <h4 style="color:#f97316">full semaphore</h4>
+          <p>Initialised to <code>0</code> (no items ready). A producer calls <code>V(full)</code> after inserting, signalling an item is available. A consumer calls <code>P(full)</code> before removing — this blocks when the buffer is empty.</p>
+        </div>
+        <div class="explain-card">
+          <h4 style="color:#a78bfa">mutex semaphore</h4>
+          <p>Initialised to <code>1</code> (unlocked). Guards the buffer data structure so only one thread modifies <code>in</code>, <code>out</code>, and the slots at a time. Turns red when locked by a thread. If two threads try to lock simultaneously, one blocks.</p>
+        </div>
+      </div>
+      <p style="font-size:0.78rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Simulation modes</p>
+      <div class="explain-modes">
+        <div class="mode-desc mode-normal"><strong>Normal</strong>All three semaphores are active. Producers and consumers synchronise correctly. The buffer never overflows or underflows. This is the correct solution.</div>
+        <div class="mode-desc mode-deadlock"><strong>Cause Deadlock</strong>The mutex is acquired <em>before</em> the empty/full semaphore (wrong order). A producer holds mutex and waits for empty; a consumer holds mutex and waits for full. Both wait forever — circular deadlock.</div>
+        <div class="mode-desc mode-starvation"><strong>Starvation</strong>Synchronisation is correct, but one producer or consumer is never scheduled. Watch a thread's status stay "waiting" indefinitely while others make progress. Starvation does not mean deadlock.</div>
+        <div class="mode-desc mode-nosync"><strong>No Sync</strong>All semaphores are removed. Producers and consumers access the buffer concurrently with no protection. Data races cause slot values to be corrupted or overwritten — demonstrating why semaphores are essential.</div>
+      </div>
+    </div>
+  </div>
 </div>
+
+<script>
+function toggleExplain(){
+  const toggle=document.getElementById('explainToggle');
+  const body=document.getElementById('explainBody');
+  toggle.classList.toggle('open');
+  body.classList.toggle('open');
+}
+</script>
 
 <script>
 // === State ===
