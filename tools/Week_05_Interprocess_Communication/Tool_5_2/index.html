@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tool 5.2 — Pipe &amp; Socket Sender · CS4023</title>
+<style>
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8;
+    --blue: #3b82f6; --green: #22c55e; --orange: #f97316;
+    --red: #ef4444; --purple: #a855f7; --yellow: #eab308;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; font-size: 14px; min-height: 100vh; }
+  header { background: #002b4e; padding: 14px 24px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 1rem; font-weight: 700; color: #fff; }
+  header span { color: var(--muted); font-size: 0.8rem; }
+
+  /* tabs */
+  .tabs { display: flex; gap: 0; background: #0f172a; border-bottom: 2px solid var(--border); }
+  .tab { padding: 10px 20px; cursor: pointer; font-size: 0.85rem; font-weight: 600; color: var(--muted); border-bottom: 3px solid transparent; margin-bottom: -2px; transition: color 0.2s; }
+  .tab.active { color: var(--orange); border-bottom-color: var(--orange); }
+  .tab-content { display: none; padding: 20px; }
+  .tab-content.active { display: block; }
+
+  /* buttons */
+  button { padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.82rem; font-weight: 600; transition: opacity 0.2s; }
+  button:hover { opacity: 0.85; }
+  button:disabled { opacity: 0.35; cursor: default; }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-ok      { background: var(--green); color: #fff; }
+  .btn-danger  { background: var(--red); color: #fff; }
+  .btn-warn    { background: var(--orange); color: #fff; }
+  .btn-reset   { background: var(--border); color: var(--text); }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+  /* status */
+  .status-box { margin-top: 10px; padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; display: none; }
+  .status-box.show { display: block; }
+  .status-box.ok   { background: #14532d; color: #86efac; border: 1px solid var(--green); }
+  .status-box.err  { background: #450a0a; color: #fca5a5; border: 1px solid var(--red); }
+  .status-box.info { background: #1e3a5f; color: #93c5fd; border: 1px solid var(--blue); }
+
+  /* ═══════ TAB 1: Socket Sequence Builder ═══════ */
+  .seq-area { display: grid; grid-template-columns: 180px 1fr 180px; gap: 16px; align-items: start; }
+  .column-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; text-align: center; margin-bottom: 8px; }
+  .server-label { color: var(--green); }
+  .client-label { color: var(--blue); }
+
+  .slot-col { display: flex; flex-direction: column; gap: 6px; }
+  .slot { display: flex; align-items: center; gap: 8px; }
+  .slot-num { font-size: 0.7rem; color: var(--muted); width: 16px; flex-shrink: 0; }
+  .drop-slot {
+    flex: 1; min-height: 32px; border: 2px dashed var(--border); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; color: var(--muted); transition: background 0.2s, border-color 0.2s;
+    padding: 4px 8px; text-align: center;
+  }
+  .drop-slot.filled { border-style: solid; color: var(--text); font-weight: 600; }
+  .drop-slot.correct { background: #14532d; border-color: var(--green); color: #86efac; }
+  .drop-slot.wrong   { background: #450a0a; border-color: var(--red);   color: #fca5a5; }
+  .drop-slot.drag-over { background: #1e3a5f; border-color: var(--blue); }
+
+  .tiles-col { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+  .tiles-col .col-title { font-size: 0.7rem; color: var(--muted); text-align: center; }
+  .api-tile {
+    padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border);
+    background: #1e293b; cursor: grab; font-size: 0.78rem; font-weight: 600;
+    color: var(--text); user-select: none; transition: opacity 0.2s; text-align: center;
+    min-width: 110px;
+  }
+  .api-tile:active { cursor: grabbing; opacity: 0.7; }
+  .api-tile.used { opacity: 0.3; cursor: default; }
+
+  /* score */
+  .score-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .score-val { font-size: 1.4rem; font-weight: 800; color: var(--orange); }
+  .score-lbl { font-size: 0.75rem; color: var(--muted); }
+
+  /* ═══════ TAB 2: Socket Type Matcher ═══════ */
+  .compare-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+  .compare-table th { padding: 8px 12px; font-size: 0.78rem; font-weight: 700; text-align: left; }
+  .compare-table td { padding: 8px 12px; font-size: 0.78rem; border-top: 1px solid var(--border); }
+  .compare-table th:nth-child(2), .compare-table td:nth-child(2) { color: var(--green); }
+  .compare-table th:nth-child(3), .compare-table td:nth-child(3) { color: var(--blue); }
+
+  .scenarios-title { font-weight: 700; color: var(--orange); margin-bottom: 10px; font-size: 0.85rem; }
+  .scenario-card {
+    background: var(--surface); border: 2px solid var(--border); border-radius: 8px;
+    padding: 10px 14px; margin-bottom: 8px; cursor: grab; user-select: none;
+    font-size: 0.82rem; transition: border-color 0.2s;
+  }
+  .scenario-card:active { cursor: grabbing; }
+  .scenario-card.placed { opacity: 0.4; cursor: default; }
+  .zones { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+  .drop-zone {
+    min-height: 80px; border: 2px dashed var(--border); border-radius: 10px;
+    padding: 10px; transition: background 0.2s, border-color 0.2s;
+  }
+  .drop-zone.drag-over { background: #1e3a5f; border-color: var(--blue); }
+  .drop-zone h3 { font-size: 0.78rem; font-weight: 700; margin-bottom: 6px; }
+  .zone-tcp h3 { color: var(--blue); }
+  .zone-unix h3 { color: var(--green); }
+  .dropped-item { 
+    font-size: 0.75rem; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 8px; margin-bottom: 4px;
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  }
+  .dropped-item .feedback { font-size: 0.7rem; font-style: italic; }
+  .dropped-item.correct .feedback { color: var(--green); }
+  .dropped-item.wrong   .feedback { color: var(--red); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔌 Tool 5.2 — Pipe &amp; Socket Sender</h1>
+  <span>CS4023 Operating Systems · Week 5 · Lecture 5.2</span>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab(0)">Tab 1 — Socket Sequence Builder</div>
+  <div class="tab"        onclick="switchTab(1)">Tab 2 — Socket Type Matcher</div>
+</div>
+
+<!-- ════════════════ TAB 1 ════════════════ -->
+<div class="tab-content active" id="tab0">
+
+  <div class="score-bar">
+    <div class="score-val" id="scoreVal">0/12</div>
+    <div class="score-lbl">correct placements (6 server + 6 client)</div>
+  </div>
+
+  <div class="seq-area">
+
+    <!-- SERVER column -->
+    <div>
+      <div class="column-label server-label">🖥 Server</div>
+      <div class="slot-col" id="serverSlots">
+        <!-- slots populated by JS -->
+      </div>
+    </div>
+
+    <!-- TILES column -->
+    <div class="tiles-col">
+      <div class="col-title">Drag calls to server<br/>or client slots</div>
+      <div id="tilesArea"></div>
+    </div>
+
+    <!-- CLIENT column -->
+    <div>
+      <div class="column-label client-label">💻 Client</div>
+      <div class="slot-col" id="clientSlots">
+      </div>
+    </div>
+
+  </div>
+
+  <div class="btn-row">
+    <button class="btn-ok"      id="btnCheck">✔ Check</button>
+    <button class="btn-warn"    id="btnAnimate" disabled>▶ Animate Connection</button>
+    <button class="btn-primary" id="btnSolution">Show Solution</button>
+    <button class="btn-reset"   id="btnResetSeq">↺ Reset</button>
+  </div>
+
+  <div id="seqStatus" class="status-box"></div>
+
+  <!-- ANIMATION AREA -->
+  <div id="animArea" style="display:none;margin-top:16px;">
+    <div style="font-size:0.82rem;font-weight:700;color:var(--orange);margin-bottom:8px;">Connection Animation</div>
+    <div style="display:flex;gap:16px;align-items:flex-start;">
+      <div id="animServer" style="width:160px;background:var(--surface);border:2px solid var(--green);border-radius:8px;padding:10px;font-size:0.72rem;"></div>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;" id="animFlow"></div>
+      <div id="animClient" style="width:160px;background:var(--surface);border:2px solid var(--blue);border-radius:8px;padding:10px;font-size:0.72rem;"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ════════════════ TAB 2 ════════════════ -->
+<div class="tab-content" id="tab1">
+
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th>Property</th>
+        <th>Unix Domain Socket</th>
+        <th>TCP Socket (AF_INET)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Scope</td><td>Same machine only</td><td>Any host (network)</td></tr>
+      <tr><td>Performance</td><td>~40 GB/s (skips network stack)</td><td>~10 GB/s (loopback)</td></tr>
+      <tr><td>Addressing</td><td>Filesystem path <code>/tmp/app.sock</code></td><td>IP address + port number</td></tr>
+      <tr><td>Bidirectional?</td><td>Yes (<code>SOCK_STREAM</code>)</td><td>Yes (<code>SOCK_STREAM</code>)</td></tr>
+      <tr><td>Credential passing</td><td>Yes — <code>SO_PASSCRED</code> + <code>SCM_CREDENTIALS</code></td><td>No — requires application-layer auth</td></tr>
+    </tbody>
+  </table>
+
+  <div class="scenarios-title">📋 Scenario Matcher — drag each card to the correct zone</div>
+
+  <div id="scenarioCards">
+    <!-- populated by JS -->
+  </div>
+
+  <div class="zones">
+    <div class="drop-zone zone-tcp" id="zoneTCP"
+         ondragover="zoneDragOver(event)" ondragleave="zoneDragLeave(event)" ondrop="zoneDrop(event,'TCP')">
+      <h3>🌐 TCP Socket (AF_INET)</h3>
+    </div>
+    <div class="drop-zone zone-unix" id="zoneUnix"
+         ondragover="zoneDragOver(event)" ondragleave="zoneDragLeave(event)" ondrop="zoneDrop(event,'UNIX')">
+      <h3>🔒 Unix Domain Socket (AF_UNIX)</h3>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn-reset" onclick="resetScenarios()">↺ Reset</button>
+  </div>
+
+  <div id="scenarioStatus" class="status-box" style="margin-top:8px;"></div>
+
+  <div style="margin-top:16px;background:#1a1a00;border:1px solid var(--yellow);border-radius:6px;padding:10px;font-size:0.75rem;">
+    <strong style="color:var(--yellow);">📚 SOCK_STREAM vs SOCK_DGRAM</strong><br/>
+    <strong>SOCK_STREAM</strong> — reliable, ordered, connection-oriented (like TCP). Data arrives in order, no message boundaries (byte stream).<br/>
+    <strong>SOCK_DGRAM</strong> — unreliable, unordered, connectionless (like UDP). Each send/recv is one discrete datagram; may be lost or reordered.
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════
+// TAB SWITCHING
+// ════════════════════════════════════════
+function switchTab(n) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===n));
+  document.querySelectorAll('.tab-content').forEach((c,i) => c.classList.toggle('active', i===n));
+}
+
+// ════════════════════════════════════════
+// TAB 1: SOCKET SEQUENCE BUILDER
+// ════════════════════════════════════════
+const SERVER_CORRECT = ['socket()', 'bind()', 'listen()', 'accept()', 'recv()/send()', 'close()'];
+const CLIENT_CORRECT = ['socket()', 'connect()', 'send()/recv()', '', '', 'close()'];
+// client has 6 slots but only 3 must match (positions 0,1,2,5)
+const CLIENT_ANSWER  = ['socket()', 'connect()', 'send()/recv()', '—', '—', 'close()'];
+
+const ALL_TILES = [
+  { id: 'socket',   label: 'socket()',       tip: 'Create a socket endpoint — returns a file descriptor' },
+  { id: 'bind',     label: 'bind()',          tip: 'Associate socket with a local address/port (server only)' },
+  { id: 'listen',   label: 'listen()',        tip: 'Mark socket as passive — willing to accept connections' },
+  { id: 'accept',   label: 'accept()',        tip: 'Block until a client connects; returns new socket fd' },
+  { id: 'connect',  label: 'connect()',       tip: 'Initiate connection to server address (client only)' },
+  { id: 'send',     label: 'send()/recv()',   tip: 'Exchange data — can loop; analogous to write/read' },
+  { id: 'recv',     label: 'recv()/send()',   tip: 'Exchange data — server side, after accept' },
+  { id: 'close',    label: 'close()',         tip: 'Close the socket fd; triggers FIN handshake on SOCK_STREAM' },
+  { id: 'setsock',  label: 'setsockopt()',    tip: 'Set socket options e.g. SO_REUSEADDR (optional)' },
+];
+
+let serverSlotData = Array(6).fill(null);
+let clientSlotData = Array(6).fill(null);
+let draggingTile = null;
+
+function buildSequenceUI() {
+  // tiles
+  const tilesArea = document.getElementById('tilesArea');
+  tilesArea.innerHTML = '';
+  ALL_TILES.forEach(t => {
+    const el = document.createElement('div');
+    el.className = 'api-tile';
+    el.id = 'tile_' + t.id;
+    el.textContent = t.label;
+    el.title = t.tip;
+    el.draggable = true;
+    el.addEventListener('dragstart', e => { draggingTile = t; e.dataTransfer.effectAllowed = 'move'; });
+    el.addEventListener('dragend',   () => { draggingTile = null; });
+    tilesArea.appendChild(el);
+  });
+
+  // server slots
+  buildSlotCol('serverSlots', serverSlotData, 'server');
+  buildSlotCol('clientSlots', clientSlotData, 'client');
+}
+
+function buildSlotCol(containerId, data, side) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  for (let i = 0; i < 6; i++) {
+    const row = document.createElement('div');
+    row.className = 'slot';
+    const num = document.createElement('div');
+    num.className = 'slot-num'; num.textContent = (i+1) + '.';
+    const slot = document.createElement('div');
+    slot.className = 'drop-slot' + (data[i] ? ' filled' : '');
+    slot.textContent = data[i] || 'drop here';
+    slot.dataset.side = side;
+    slot.dataset.idx  = i;
+    slot.addEventListener('dragover',  e => { e.preventDefault(); slot.classList.add('drag-over'); });
+    slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+    slot.addEventListener('drop', e => {
+      e.preventDefault(); slot.classList.remove('drag-over');
+      if (!draggingTile) return;
+      const arr = slot.dataset.side === 'server' ? serverSlotData : clientSlotData;
+      arr[+slot.dataset.idx] = draggingTile.label;
+      document.getElementById('seqStatus').className = 'status-box';
+      buildSlotCol('serverSlots', serverSlotData, 'server');
+      buildSlotCol('clientSlots', clientSlotData, 'client');
+    });
+    row.appendChild(num); row.appendChild(slot);
+    container.appendChild(row);
+  }
+}
+
+document.getElementById('btnCheck').addEventListener('click', checkSequence);
+document.getElementById('btnResetSeq').addEventListener('click', () => {
+  serverSlotData = Array(6).fill(null);
+  clientSlotData = Array(6).fill(null);
+  document.getElementById('seqStatus').className = 'status-box';
+  document.getElementById('btnAnimate').disabled = true;
+  document.getElementById('animArea').style.display = 'none';
+  document.getElementById('scoreVal').textContent = '0/12';
+  buildSequenceUI();
+});
+
+document.getElementById('btnSolution').addEventListener('click', () => {
+  serverSlotData = [...SERVER_CORRECT];
+  clientSlotData = [...CLIENT_ANSWER];
+  buildSlotCol('serverSlots', serverSlotData, 'server');
+  buildSlotCol('clientSlots', clientSlotData, 'client');
+  checkSequence();
+});
+
+function checkSequence() {
+  const sSlots = document.querySelectorAll('#serverSlots .drop-slot');
+  const cSlots = document.querySelectorAll('#clientSlots .drop-slot');
+  let correct = 0;
+
+  const sExplain = ['Creates the listening socket fd','Binds socket to address/port','Marks socket as passive; queues incoming connections','Blocks until a client connects; returns new fd','Exchanges data with the connected client','Releases the socket fd; triggers TCP FIN'];
+  const cExplain = ['Creates the socket fd','Initiates connection to server address','Exchanges data with server','(not required on client)','(not required on client)','Closes the connection'];
+
+  sSlots.forEach((sl, i) => {
+    const ok = sl.textContent.trim() === SERVER_CORRECT[i];
+    sl.classList.remove('correct','wrong');
+    if (sl.textContent.trim() !== 'drop here') {
+      sl.classList.add(ok ? 'correct' : 'wrong');
+      if (ok) correct++;
+      sl.title = sExplain[i];
+    }
+  });
+
+  const clientReq = [0,1,2,5]; // required slots for client
+  cSlots.forEach((sl, i) => {
+    const val = sl.textContent.trim();
+    sl.classList.remove('correct','wrong');
+    if (val !== 'drop here' && val !== '—') {
+      const ok = val === CLIENT_ANSWER[i] || (i===3||i===4);
+      sl.classList.add(ok ? 'correct' : 'wrong');
+      if (clientReq.includes(i) && val === CLIENT_ANSWER[i]) correct++;
+      sl.title = cExplain[i];
+    }
+  });
+
+  document.getElementById('scoreVal').textContent = `${correct}/10`;
+  const status = document.getElementById('seqStatus');
+  if (correct === 10) {
+    showStatus(status, 'ok', '✓ Perfect! All API calls are in the correct order. You can now animate the connection.');
+    document.getElementById('btnAnimate').disabled = false;
+  } else {
+    showStatus(status, 'err', `${correct}/10 correct — red slots are wrong. Check the order: server must listen before accept; client connects before sending.`);
+  }
+}
+
+document.getElementById('btnAnimate').addEventListener('click', animateConnection);
+
+const ANIM_STEPS = [
+  { srv: 'socket() ✓',   cli: '',            msg: '',                        dir: null },
+  { srv: 'bind() ✓',     cli: '',            msg: '',                        dir: null },
+  { srv: 'listen() ✓',   cli: '',            msg: 'Server listening…',       dir: null },
+  { srv: '',              cli: 'socket() ✓', msg: '',                        dir: null },
+  { srv: 'accept()…',    cli: 'connect() →', msg: 'TCP SYN →',               dir: 'right' },
+  { srv: '← SYN-ACK',   cli: '',            msg: '← SYN-ACK',               dir: 'left' },
+  { srv: '',              cli: '← ACK sent', msg: 'ACK → (connected!)',       dir: 'right' },
+  { srv: 'accept() ✓',   cli: '',            msg: 'Connection established',   dir: null },
+  { srv: 'recv()…',      cli: 'send() →',   msg: '"Hello from client" →',    dir: 'right' },
+  { srv: '← send() ACK',cli: '',            msg: '← "ACK"',                 dir: 'left' },
+  { srv: 'close()',      cli: 'close()',     msg: 'FIN → / ← FIN-ACK',       dir: 'right' },
+];
+
+function animateConnection() {
+  const animArea = document.getElementById('animArea');
+  animArea.style.display = 'block';
+  const srvEl = document.getElementById('animServer');
+  const cliEl = document.getElementById('animClient');
+  const flowEl = document.getElementById('animFlow');
+  srvEl.innerHTML = '<strong style="color:var(--green)">Server</strong>';
+  cliEl.innerHTML = '<strong style="color:var(--blue)">Client</strong>';
+  flowEl.innerHTML = '';
+  let step = 0;
+  const run = setInterval(() => {
+    if (step >= ANIM_STEPS.length) { clearInterval(run); return; }
+    const s = ANIM_STEPS[step];
+    if (s.srv) srvEl.innerHTML += `<div style="margin-top:4px;color:var(--green)">${s.srv}</div>`;
+    if (s.cli) cliEl.innerHTML += `<div style="margin-top:4px;color:var(--blue)">${s.cli}</div>`;
+    if (s.msg) {
+      const arrow = document.createElement('div');
+      arrow.style.cssText = `font-size:0.72rem;color:var(--orange);padding:2px 6px;border:1px solid var(--orange);border-radius:4px;text-align:center;`;
+      arrow.textContent = s.msg;
+      flowEl.appendChild(arrow);
+    }
+    step++;
+  }, 700);
+}
+
+// ════════════════════════════════════════
+// TAB 2: SOCKET TYPE MATCHER
+// ════════════════════════════════════════
+const SCENARIOS = [
+  { id: 's1', text: 'Web browser connecting to a remote web server', answer: 'TCP',  explain: 'Remote host → must use TCP (AF_INET)' },
+  { id: 's2', text: 'systemd communicating with a daemon on the same machine', answer: 'UNIX', explain: 'Local IPC → Unix socket is faster and more secure' },
+  { id: 's3', text: 'A distributed database replicating to a replica in another data centre', answer: 'TCP', explain: 'Cross-machine → TCP required' },
+  { id: 's4', text: 'nginx worker processes communicating with each other', answer: 'UNIX', explain: 'Same machine, performance-critical → Unix socket' },
+  { id: 's5', text: 'Mobile app streaming video to a cloud CDN', answer: 'TCP',  explain: 'Network connection → TCP (or UDP for raw streaming)' },
+];
+
+let scenarioDragging = null;
+let scenarioPlaced = {};
+
+function buildScenarios() {
+  const container = document.getElementById('scenarioCards');
+  container.innerHTML = '';
+  SCENARIOS.forEach(sc => {
+    const el = document.createElement('div');
+    el.className = 'scenario-card' + (scenarioPlaced[sc.id] ? ' placed' : '');
+    el.id = 'sc_' + sc.id;
+    el.textContent = sc.text;
+    el.draggable = !scenarioPlaced[sc.id];
+    el.addEventListener('dragstart', e => { scenarioDragging = sc; e.dataTransfer.effectAllowed = 'move'; });
+    container.appendChild(el);
+  });
+
+  ['zoneTCP','zoneUnix'].forEach(zid => {
+    const zone = document.getElementById(zid);
+    // keep title, remove old dropped items
+    const h3 = zone.querySelector('h3');
+    zone.innerHTML = '';
+    zone.appendChild(h3);
+  });
+
+  Object.entries(scenarioPlaced).forEach(([id, zone]) => {
+    const sc = SCENARIOS.find(s => s.id === id);
+    const correct = sc.answer === zone;
+    const zoneEl = document.getElementById(zone === 'TCP' ? 'zoneTCP' : 'zoneUnix');
+    const item = document.createElement('div');
+    item.className = 'dropped-item ' + (correct ? 'correct' : 'wrong');
+    item.innerHTML = `<span>${sc.text}</span><span class="feedback">${correct ? '✓' : '✗'} ${sc.explain}</span>`;
+    zoneEl.appendChild(item);
+  });
+
+  const placed = Object.keys(scenarioPlaced).length;
+  const correct = Object.entries(scenarioPlaced).filter(([id,z]) => SCENARIOS.find(s=>s.id===id).answer===z).length;
+  if (placed === SCENARIOS.length) {
+    showStatus(document.getElementById('scenarioStatus'), correct===SCENARIOS.length ? 'ok' : 'err',
+      `${correct}/${SCENARIOS.length} correct.` + (correct<SCENARIOS.length ? ' Review the red items above.' : ' Well done!'));
+  }
+}
+
+function zoneDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+function zoneDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+function zoneDrop(e, zone) {
+  e.preventDefault(); e.currentTarget.classList.remove('drag-over');
+  if (!scenarioDragging) return;
+  scenarioPlaced[scenarioDragging.id] = zone;
+  scenarioDragging = null;
+  buildScenarios();
+}
+
+function resetScenarios() {
+  scenarioPlaced = {};
+  document.getElementById('scenarioStatus').className = 'status-box';
+  buildScenarios();
+}
+
+// ── helpers ──
+function showStatus(el, type, msg) {
+  el.textContent = msg; el.className = 'status-box show ' + type;
+}
+
+// init
+buildSequenceUI();
+buildScenarios();
+</script>
+</body>
+</html>

@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tool 5.1 — Shared Memory Visualiser · CS4023</title>
+<style>
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8;
+    --blue: #3b82f6; --green: #22c55e; --orange: #f97316;
+    --yellow: #eab308; --red: #ef4444; --purple: #a855f7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; font-size: 14px; }
+  header { background: #002b4e; padding: 14px 24px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 1rem; font-weight: 700; color: #fff; }
+  header span { color: var(--muted); font-size: 0.8rem; }
+  .main { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .panel h2 { font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--orange); margin-bottom: 12px; }
+  /* ── memory bar ── */
+  .mem-row { display: flex; gap: 12px; align-items: flex-start; }
+  .proc-label { font-size: 0.75rem; font-weight: 700; color: var(--muted); text-align: center; width: 70px; flex-shrink: 0; }
+  .mem-bar { width: 70px; border: 2px solid var(--border); border-radius: 6px; overflow: hidden; flex-shrink: 0; }
+  .seg { padding: 6px 4px; text-align: center; font-size: 0.7rem; font-weight: 600; transition: background 0.3s; cursor: pointer; }
+  .seg-stack { background: #1e3a5f; }
+  .seg-heap  { background: #1e4a2e; }
+  .seg-data  { background: #3b2e1e; }
+  .seg-text  { background: #2e1e3b; }
+  .seg-shared { background: var(--yellow); color: #1a1a00; font-weight: 700; }
+  .seg-shared.none { background: var(--border); color: var(--muted); }
+  /* bridge */
+  .shm-bridge-row { display: flex; align-items: center; justify-content: center; gap: 0; margin: 4px 0; }
+  .bridge-line { height: 2px; background: var(--yellow); flex: 1; opacity: 0; transition: opacity 0.5s; }
+  .bridge-label { font-size: 0.65rem; color: var(--yellow); white-space: nowrap; margin: 0 6px; }
+  /* value display */
+  .shm-value-row { margin-top: 12px; }
+  .shm-value-row label { font-size: 0.75rem; color: var(--muted); display: block; margin-bottom: 4px; }
+  .shm-inputs { display: flex; gap: 8px; align-items: center; }
+  .shm-inputs input { background: #0f172a; border: 1px solid var(--border); color: var(--text); padding: 4px 8px; border-radius: 4px; width: 90px; font-size: 0.85rem; }
+  .shm-mirror { background: #0f172a; border: 1px solid var(--yellow); color: var(--yellow); padding: 4px 8px; border-radius: 4px; width: 90px; font-size: 0.85rem; text-align: center; font-weight: 700; }
+  .arrow-label { color: var(--muted); font-size: 0.75rem; }
+  /* status box */
+  .status-box { margin-top: 10px; padding: 8px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; display: none; }
+  .status-box.show { display: block; }
+  .status-box.ok { background: #14532d; color: #86efac; border: 1px solid #22c55e; }
+  .status-box.err { background: #450a0a; color: #fca5a5; border: 1px solid var(--red); }
+  .status-box.info { background: #1e3a5f; color: #93c5fd; border: 1px solid var(--blue); }
+  /* buttons */
+  .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  button { padding: 6px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: opacity 0.2s; }
+  button:hover { opacity: 0.85; }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-danger  { background: var(--red);  color: #fff; }
+  .btn-ok      { background: var(--green); color: #fff; }
+  .btn-warn    { background: var(--orange); color: #fff; }
+  .btn-reset   { background: var(--border); color: var(--text); }
+  /* ── pipe section ── */
+  .pipe-area { margin-top: 8px; }
+  .pipe-proc-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .pipe-box { background: #1e3a5f; border: 2px solid var(--blue); border-radius: 8px; padding: 8px 10px; font-size: 0.75rem; text-align: center; min-width: 80px; }
+  .pipe-box .name { font-weight: 700; color: var(--blue); }
+  .pipe-tube-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; position: relative; }
+  .pipe-tube { width: 100%; height: 28px; background: #7c2d12; border: 2px solid var(--orange); border-radius: 14px; position: relative; overflow: hidden; }
+  .pipe-tube-labels { display: flex; justify-content: space-between; font-size: 0.6rem; color: var(--muted); width: 100%; margin-top: 2px; padding: 0 4px; }
+  .pipe-byte { position: absolute; top: 4px; height: 18px; background: var(--orange); border-radius: 4px; font-size: 0.6rem; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; padding: 0 4px; transition: left 1s ease-in-out; }
+  .pipe-msg-input { display: flex; gap: 8px; margin-top: 10px; }
+  .pipe-msg-input input { flex: 1; background: #0f172a; border: 1px solid var(--border); color: var(--text); padding: 5px 8px; border-radius: 4px; font-size: 0.85rem; }
+  .child-buf { margin-top: 8px; background: #0f172a; border: 1px solid var(--green); border-radius: 6px; padding: 8px; font-size: 0.8rem; min-height: 32px; color: var(--green); font-family: monospace; }
+  .pipe-write-closed { border-color: var(--border) !important; background: var(--border) !important; }
+  /* section divider */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+  /* tooltip */
+  [data-tip] { position: relative; cursor: help; }
+  [data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%);
+    background: #1e293b; border: 1px solid var(--border); color: var(--text);
+    font-size: 0.7rem; padding: 4px 8px; border-radius: 4px; white-space: nowrap; z-index: 10;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔬 Tool 5.1 — Shared Memory Visualiser</h1>
+  <span>CS4023 Operating Systems · Week 5 · Lecture 5.1</span>
+</header>
+
+<div class="main">
+
+  <!-- ═══════ LEFT: SHARED MEMORY ═══════ -->
+  <div class="panel">
+    <h2>📦 Shared Memory — <code>shm_open</code> + <code>mmap</code></h2>
+
+    <div class="mem-row">
+      <!-- Process A bar -->
+      <div style="display:flex;flex-direction:column;align-items:center;">
+        <div class="proc-label">Process A<br/><span style="font-size:0.65rem;color:var(--muted)">(pid 1001)</span></div>
+        <div class="mem-bar" id="barA">
+          <div class="seg seg-stack" title="Stack">stack</div>
+          <div class="seg seg-heap"  title="Heap">heap</div>
+          <div class="seg seg-shared none" id="shmA">shm<br/>—</div>
+          <div class="seg seg-data"  title="Data segment">data</div>
+          <div class="seg seg-text"  title="Code segment">text</div>
+        </div>
+      </div>
+
+      <!-- Bridge -->
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding-top:40px;">
+        <div style="font-size:0.65rem;color:var(--yellow);text-align:center;opacity:0;transition:opacity 0.5s;" id="bridgeLabel">Physical page<br/>(shared)</div>
+        <div style="display:flex;width:100%;align-items:center;">
+          <div style="height:2px;flex:1;opacity:0;background:var(--yellow);transition:opacity 0.5s;" id="bridge1"></div>
+          <div style="width:12px;height:12px;border-radius:50%;background:var(--yellow);opacity:0;transition:opacity 0.5s;" id="bridgeDot"></div>
+          <div style="height:2px;flex:1;opacity:0;background:var(--yellow);transition:opacity 0.5s;" id="bridge2"></div>
+        </div>
+      </div>
+
+      <!-- Process B bar -->
+      <div style="display:flex;flex-direction:column;align-items:center;">
+        <div class="proc-label">Process B<br/><span style="font-size:0.65rem;color:var(--muted)">(pid 1002)</span></div>
+        <div class="mem-bar" id="barB">
+          <div class="seg seg-stack">stack</div>
+          <div class="seg seg-heap">heap</div>
+          <div class="seg seg-shared none" id="shmB">shm<br/>—</div>
+          <div class="seg seg-data">data</div>
+          <div class="seg seg-text">text</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="shm-value-row" id="shmValueRow" style="display:none;">
+      <label>Write a value into Process A's shared segment — watch it appear in B:</label>
+      <div class="shm-inputs">
+        <div>
+          <div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Process A writes</div>
+          <input type="text" id="shmInput" placeholder="e.g. 42" maxlength="10" />
+        </div>
+        <div class="arrow-label" style="margin-top:16px;">→ mmap → shared page →</div>
+        <div>
+          <div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Process B reads</div>
+          <div class="shm-mirror" id="shmMirror">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="raceStatus" class="status-box"></div>
+
+    <div class="btn-row">
+      <button class="btn-primary" id="btnCreate" data-tip="Calls shm_open() + ftruncate() + mmap() in both processes">🔧 Create Shared Region</button>
+      <button class="btn-danger" id="btnRace" disabled data-tip="Two threads write counter++ 10,000x without synchronisation">⚡ Unsynchronised Race</button>
+      <button class="btn-ok"   id="btnSema" disabled data-tip="Adds a process-shared mutex inside the shared region — race disappears">🔒 Add Semaphore</button>
+      <button class="btn-reset" id="btnShmReset">↺ Reset</button>
+    </div>
+
+    <hr class="divider" />
+    <div style="font-size:0.7rem;color:var(--muted);">
+      <strong>Key insight:</strong> after <code>mmap(MAP_SHARED)</code>, both process address spaces map to the <em>same physical page</em>. Writes by one process are instantly visible to the other — but with no serialisation guarantee.
+    </div>
+  </div>
+
+  <!-- ═══════ RIGHT: PIPES ═══════ -->
+  <div class="panel">
+    <h2>🔗 Pipes — <code>pipe()</code> + <code>fork()</code></h2>
+
+    <div class="pipe-area">
+      <div class="pipe-proc-row">
+        <div class="pipe-box">
+          <div class="name">Parent</div>
+          <div style="font-size:0.65rem;color:var(--muted);">write end<br/>pfd[1]</div>
+        </div>
+        <div class="pipe-tube-wrap" style="flex:1;">
+          <div class="pipe-tube" id="pipeTube">
+            <div class="pipe-byte" id="pipeByteEl" style="left:-60px;display:none;"></div>
+          </div>
+          <div class="pipe-tube-labels"><span>write end →</span><span>← read end</span></div>
+        </div>
+        <div class="pipe-box" id="childBox">
+          <div class="name">Child</div>
+          <div style="font-size:0.65rem;color:var(--muted);">read end<br/>pfd[0]</div>
+        </div>
+      </div>
+
+      <div class="pipe-msg-input">
+        <input type="text" id="pipeMsg" placeholder="Message to send (parent → child)" maxlength="40" />
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-warn" id="btnWrite" data-tip="Calls write(pfd[1], msg, len) — bytes flow into the kernel buffer">✉️ Write to Pipe</button>
+        <button class="btn-danger" id="btnCloseWrite" data-tip="close(pfd[1]) — signals EOF. Child's read() will return 0 when buffer drains.">🚫 Close Write End</button>
+        <button class="btn-reset" id="btnPipeReset">↺ Reset</button>
+      </div>
+
+      <div style="margin-top:10px;">
+        <div style="font-size:0.7rem;color:var(--muted);margin-bottom:4px;">Child's read buffer:</div>
+        <div class="child-buf" id="childBuf">(waiting…)</div>
+      </div>
+
+      <div id="pipeStatus" class="status-box" style="margin-top:8px;"></div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- WHY CLOSE -->
+    <div style="background:#1a1a00;border:1px solid var(--yellow);border-radius:6px;padding:10px;font-size:0.75rem;">
+      <strong style="color:var(--yellow);">❓ Why must you close unused pipe ends?</strong><br/>
+      A pipe EOF (<code>read()</code> returns 0) only arrives when <em>all</em> write-end file descriptors are closed. If the parent forgets to close its own copy of the write end, the child's <code>read()</code> blocks forever — the kernel thinks there is still a writer.
+    </div>
+
+    <hr class="divider" />
+    <div style="font-size:0.7rem;color:var(--muted);">
+      <strong>Pipe vs Shared Memory throughput:</strong>
+      <table style="width:100%;border-collapse:collapse;margin-top:4px;">
+        <tr style="color:var(--orange);"><td>Pipe</td><td>~5 GB/s</td><td>2 copies (user→kernel→user)</td></tr>
+        <tr><td>Shared mem</td><td>~50 GB/s</td><td>0 copies — DRAM speed</td></tr>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ════════════════════════════════════════
+// SHARED MEMORY SECTION
+// ════════════════════════════════════════
+let shmCreated = false;
+let semaActive = false;
+let raceInterval = null;
+
+const shmA = document.getElementById('shmA');
+const shmB = document.getElementById('shmB');
+const shmMirror = document.getElementById('shmMirror');
+const shmInput  = document.getElementById('shmInput');
+const shmValueRow = document.getElementById('shmValueRow');
+const raceStatus = document.getElementById('raceStatus');
+const bridge1 = document.getElementById('bridge1');
+const bridge2 = document.getElementById('bridge2');
+const bridgeDot = document.getElementById('bridgeDot');
+const bridgeLabel = document.getElementById('bridgeLabel');
+const btnRace = document.getElementById('btnRace');
+const btnSema = document.getElementById('btnSema');
+
+document.getElementById('btnCreate').addEventListener('click', () => {
+  shmCreated = true;
+  shmA.classList.remove('none');
+  shmA.textContent = 'shm\n0x7f00';
+  shmB.classList.remove('none');
+  shmB.textContent = 'shm\n0x7f00';
+  [bridge1, bridge2, bridgeDot].forEach(el => el.style.opacity = '1');
+  bridgeLabel.style.opacity = '1';
+  shmValueRow.style.display = 'block';
+  btnRace.disabled = false;
+  btnSema.disabled = false;
+  showStatus(raceStatus, 'info', 'Shared region created — /dev/shm/cs4023_demo mapped into both address spaces at the same virtual offset.');
+});
+
+shmInput.addEventListener('input', () => {
+  if (shmCreated) {
+    const v = shmInput.value || '—';
+    shmMirror.textContent = v;
+    shmA.innerHTML = `shm<br/>${v}`;
+    shmB.innerHTML = `shm<br/>${v}`;
+  }
+});
+
+document.getElementById('btnRace').addEventListener('click', () => {
+  if (!shmCreated) return;
+  if (raceInterval) { clearInterval(raceInterval); raceInterval = null; }
+  let counter = 0;
+  const target = 10; // simulated
+  let writes = 0;
+  showStatus(raceStatus, 'info', 'Running 2 unsynchronised writers (10,000 iterations each)…');
+  raceInterval = setInterval(() => {
+    // simulate non-deterministic interleaving
+    const a = counter + 1;
+    const b = counter + 1;
+    counter = Math.random() > 0.5 ? a : b; // only one write "wins"
+    writes++;
+    shmA.innerHTML = `shm<br/>${counter}`;
+    shmB.innerHTML = `shm<br/>${counter}`;
+    shmInput.value = counter;
+    shmMirror.textContent = counter;
+    if (writes >= 20) {
+      clearInterval(raceInterval); raceInterval = null;
+      const expected = 20000;
+      const got = counter + Math.floor(Math.random() * 8000) + 1000; // random < expected
+      showStatus(raceStatus, 'err', `Race condition! Expected ~${expected.toLocaleString()}, got ${got.toLocaleString()} — lost updates due to non-atomic read-modify-write.`);
+    }
+  }, 80);
+});
+
+document.getElementById('btnSema').addEventListener('click', () => {
+  if (!shmCreated) return;
+  if (raceInterval) { clearInterval(raceInterval); raceInterval = null; }
+  semaActive = true;
+  let counter = 0;
+  let writes = 0;
+  showStatus(raceStatus, 'info', 'Semaphore active — writers call P(sem) before write, V(sem) after…');
+  raceInterval = setInterval(() => {
+    counter += 2; // both writers succeed, serialised
+    writes++;
+    shmA.innerHTML = `shm<br/>${counter}`;
+    shmB.innerHTML = `shm<br/>${counter}`;
+    shmInput.value = counter;
+    shmMirror.textContent = counter;
+    if (writes >= 20) {
+      clearInterval(raceInterval); raceInterval = null;
+      showStatus(raceStatus, 'ok', `✓ Correct result: ${counter * 1000} (scaled) — mutex serialised all writes. No lost updates.`);
+    }
+  }, 80);
+});
+
+document.getElementById('btnShmReset').addEventListener('click', () => {
+  if (raceInterval) { clearInterval(raceInterval); raceInterval = null; }
+  shmCreated = false; semaActive = false;
+  shmA.classList.add('none'); shmA.textContent = 'shm\n—';
+  shmB.classList.add('none'); shmB.textContent = 'shm\n—';
+  [bridge1, bridge2, bridgeDot].forEach(el => el.style.opacity = '0');
+  bridgeLabel.style.opacity = '0';
+  shmValueRow.style.display = 'none';
+  shmInput.value = ''; shmMirror.textContent = '—';
+  raceStatus.className = 'status-box';
+  btnRace.disabled = true; btnSema.disabled = true;
+});
+
+// ════════════════════════════════════════
+// PIPES SECTION
+// ════════════════════════════════════════
+let writeClosed = false;
+const pipeTube   = document.getElementById('pipeTube');
+const pipeByteEl = document.getElementById('pipeByteEl');
+const childBuf   = document.getElementById('childBuf');
+const pipeStatus = document.getElementById('pipeStatus');
+
+document.getElementById('btnWrite').addEventListener('click', () => {
+  if (writeClosed) { showStatus(pipeStatus, 'err', 'Cannot write — write end is closed! SIGPIPE / EPIPE would be raised.'); return; }
+  const msg = document.getElementById('pipeMsg').value.trim() || 'Hello from parent!';
+  animatePipe(msg);
+});
+
+function animatePipe(msg) {
+  childBuf.textContent = '(receiving…)';
+  childBuf.style.color = 'var(--muted)';
+  pipeByteEl.textContent = msg.length > 8 ? msg.slice(0,6)+'…' : msg;
+  pipeByteEl.style.display = 'flex';
+  pipeByteEl.style.left = '-60px';
+  pipeByteEl.style.background = 'var(--orange)';
+  showStatus(pipeStatus, 'info', `write(pfd[1], "${msg}", ${msg.length}) — ${msg.length} bytes into kernel buffer…`);
+  // animate: move from left to right
+  setTimeout(() => { pipeByteEl.style.left = (pipeTube.offsetWidth - 10) + 'px'; }, 50);
+  setTimeout(() => {
+    pipeByteEl.style.display = 'none';
+    pipeByteEl.style.left = '-60px';
+    childBuf.textContent = `"${msg}"`;
+    childBuf.style.color = 'var(--green)';
+    showStatus(pipeStatus, 'ok', `read(pfd[0], buf, …) returned ${msg.length} — child received message.`);
+  }, 1100);
+}
+
+document.getElementById('btnCloseWrite').addEventListener('click', () => {
+  writeClosed = true;
+  // grey out write end of tube
+  pipeTube.style.borderColor = 'var(--border)';
+  pipeTube.style.background = '#1e293b';
+  showStatus(pipeStatus, 'err', 'close(pfd[1]) called — all write ends now closed. Child\'s next read() will return 0 (EOF).');
+  // simulate final read returning 0
+  setTimeout(() => {
+    childBuf.textContent = 'read() returned 0 — EOF';
+    childBuf.style.color = 'var(--muted)';
+  }, 600);
+  document.getElementById('btnCloseWrite').disabled = true;
+});
+
+document.getElementById('btnPipeReset').addEventListener('click', () => {
+  writeClosed = false;
+  pipeTube.style.borderColor = 'var(--orange)';
+  pipeTube.style.background = '#7c2d12';
+  pipeByteEl.style.display = 'none';
+  childBuf.textContent = '(waiting…)';
+  childBuf.style.color = 'var(--green)';
+  document.getElementById('pipeMsg').value = '';
+  document.getElementById('btnCloseWrite').disabled = false;
+  pipeStatus.className = 'status-box';
+});
+
+// ── helpers ──
+function showStatus(el, type, msg) {
+  el.textContent = msg;
+  el.className = 'status-box show ' + type;
+}
+</script>
+</body>
+</html>
