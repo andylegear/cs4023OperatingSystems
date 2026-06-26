@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CS4023 — Bounded Buffer Visualiser</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+  header{background:#1e293b;padding:14px 24px;border-bottom:2px solid #334155;display:flex;align-items:center;gap:16px}
+  header h1{font-size:1.1rem;font-weight:700;color:#f1f5f9}
+  header span{font-size:0.82rem;color:#94a3b8}
+  .container{padding:16px 20px;max-width:1100px;margin:0 auto}
+  /* Controls */
+  .controls{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;align-items:center}
+  .ctrl-group{display:flex;flex-direction:column;gap:3px}
+  .ctrl-group label{font-size:0.72rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em}
+  select,input[type=range]{background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px 8px;font-size:0.85rem}
+  input[type=range]{padding:2px 4px;width:90px;accent-color:#3b82f6}
+  .mode-buttons{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  button{cursor:pointer;border:none;border-radius:6px;padding:6px 14px;font-size:0.82rem;font-weight:600;transition:background .15s}
+  .btn-primary{background:#3b82f6;color:#fff}
+  .btn-primary:hover{background:#2563eb}
+  .btn-mode{background:#1e293b;color:#94a3b8;border:1px solid #334155}
+  .btn-mode.active{background:#0f172a;border-color:#3b82f6;color:#3b82f6}
+  .btn-mode.danger.active{border-color:#ef4444;color:#ef4444}
+  .btn-mode.warn.active{border-color:#f59e0b;color:#f59e0b}
+  .btn-step{background:#334155;color:#e2e8f0}
+  .btn-step:hover{background:#475569}
+  /* Layout */
+  .main-area{display:grid;grid-template-columns:200px 1fr 200px;gap:14px;align-items:start;margin-bottom:14px}
+  .threads-col{display:flex;flex-direction:column;gap:8px}
+  .thread-card{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:8px 10px}
+  .thread-card .name{font-size:0.75rem;font-weight:700;color:#94a3b8;margin-bottom:4px}
+  .thread-card .status{font-size:0.78rem;min-height:1.4em;line-height:1.4}
+  .status-producing{color:#a78bfa}
+  .status-waiting{color:#fbbf24}
+  .status-inserting{color:#34d399}
+  .status-consuming{color:#a78bfa}
+  .status-removing{color:#34d399}
+  .status-idle{color:#475569}
+  .status-deadlocked{color:#ef4444;font-weight:700}
+  /* Buffer */
+  .buffer-area{display:flex;flex-direction:column;align-items:center;gap:10px}
+  .buffer-title{font-size:0.8rem;color:#94a3b8;text-align:center}
+  .buffer-slots{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+  .slot{width:52px;height:52px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:700;border:2px solid #334155;transition:background .25s,border-color .25s}
+  .slot.empty{background:#1e293b;color:#475569;border-color:#334155}
+  .slot.filled{background:#1d4ed8;color:#fff;border-color:#3b82f6}
+  .slot.active-in{border-color:#34d399;box-shadow:0 0 8px #34d39966}
+  .slot.active-out{border-color:#f59e0b;box-shadow:0 0 8px #f59e0b66}
+  /* Semaphores */
+  .sems{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+  .sem-card{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:10px 16px;text-align:center;min-width:80px}
+  .sem-card .sem-name{font-size:0.7rem;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em}
+  .sem-card .sem-val{font-size:1.8rem;font-weight:800;line-height:1}
+  .sem-empty .sem-val{color:#34d399}
+  .sem-full .sem-val{color:#f97316}
+  .sem-mutex .sem-val{color:#a78bfa}
+  .sem-mutex.locked .sem-val{color:#ef4444}
+  /* Deadlock banner */
+  .deadlock-banner{display:none;background:#7f1d1d;border:2px solid #ef4444;border-radius:8px;padding:12px 16px;color:#fca5a5;font-size:0.88rem;margin-bottom:12px}
+  .deadlock-banner.visible{display:block}
+  /* Trace log */
+  .trace-area{background:#0f172a;border:1px solid #334155;border-radius:8px;height:140px;overflow-y:auto;padding:8px 12px;font-family:'Courier New',monospace;font-size:0.76rem}
+  .trace-entry{padding:1px 0;color:#94a3b8}
+  .trace-entry .op{font-weight:700}
+  .op-wait{color:#fbbf24}
+  .op-post{color:#34d399}
+  .op-deadlock{color:#ef4444}
+  .trace-entry .ts{color:#475569;margin-right:6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>CS4023 — Bounded Buffer Visualiser</h1>
+  <span>L8.1 · Classic Concurrency Problems</span>
+</header>
+<div class="container">
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="ctrl-group">
+      <label>Buffer N</label>
+      <select id="selN">
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5" selected>5</option>
+        <option value="6">6</option>
+        <option value="8">8</option>
+      </select>
+    </div>
+    <div class="ctrl-group">
+      <label>Producers</label>
+      <select id="selP">
+        <option value="1">1</option>
+        <option value="2" selected>2</option>
+        <option value="3">3</option>
+      </select>
+    </div>
+    <div class="ctrl-group">
+      <label>Consumers</label>
+      <select id="selC">
+        <option value="1">1</option>
+        <option value="2" selected>2</option>
+        <option value="3">3</option>
+      </select>
+    </div>
+    <div class="ctrl-group">
+      <label>Speed</label>
+      <input type="range" id="rangeSpeed" min="1" max="3" value="2">
+    </div>
+    <div style="display:flex;gap:6px;align-items:flex-end">
+      <button class="btn-primary" id="btnPlay" onclick="togglePlay()">▶ Play</button>
+      <button class="btn-step" onclick="step()">Step</button>
+      <button class="btn-step" onclick="resetSim()">Reset</button>
+    </div>
+  </div>
+
+  <div class="mode-buttons">
+    <span style="font-size:0.78rem;color:#94a3b8;align-self:center;margin-right:4px">Mode:</span>
+    <button class="btn-mode active" id="mode-normal" onclick="setMode('normal')">Normal</button>
+    <button class="btn-mode danger" id="mode-deadlock" onclick="setMode('deadlock')">Cause Deadlock</button>
+    <button class="btn-mode warn" id="mode-starvation" onclick="setMode('starvation')">Starvation</button>
+    <button class="btn-mode warn" id="mode-nosync" onclick="setMode('nosync')">No Sync</button>
+  </div>
+
+  <!-- Deadlock banner -->
+  <div class="deadlock-banner" id="deadlockBanner"></div>
+
+  <!-- Main area -->
+  <div class="main-area">
+    <div class="threads-col" id="producerCol"></div>
+    <div class="buffer-area">
+      <div class="buffer-title" id="bufferTitle">Buffer (N=5)</div>
+      <div class="buffer-slots" id="bufferSlots"></div>
+      <div class="sems">
+        <div class="sem-card sem-empty">
+          <div class="sem-name">empty</div>
+          <div class="sem-val" id="semEmpty">5</div>
+        </div>
+        <div class="sem-card sem-full">
+          <div class="sem-name">full</div>
+          <div class="sem-val" id="semFull">0</div>
+        </div>
+        <div class="sem-card sem-mutex" id="semMutexCard">
+          <div class="sem-name">mutex</div>
+          <div class="sem-val" id="semMutex">1</div>
+        </div>
+      </div>
+    </div>
+    <div class="threads-col" id="consumerCol"></div>
+  </div>
+
+  <!-- Trace -->
+  <div style="font-size:0.75rem;color:#64748b;margin-bottom:4px">Trace Log</div>
+  <div class="trace-area" id="traceLog"></div>
+</div>
+
+<script>
+// === State ===
+let N=5, numP=2, numC=2, mode='normal';
+let buf=[], head=0, tail=0, count=0;
+let semEmpty, semFull, semMutex;
+let producers=[], consumers=[];
+let running=false, timer=null, tick=0;
+let deadlocked=false;
+const SPEEDS=[null,800,400,150];
+
+function getSpeed(){ return SPEEDS[+document.getElementById('rangeSpeed').value]; }
+
+// === Thread state machine ===
+const P_STATES=['producing','p_wait_empty','p_wait_mutex','inserting'];
+const C_STATES=['consuming','c_wait_full','c_wait_mutex','removing'];
+
+function makeProducer(id){
+  return {id,state:'producing',item:0,stateTimer:0,held_mutex:false};
+}
+function makeConsumer(id){
+  return {id,state:'consuming',item:0,stateTimer:0,held_mutex:false};
+}
+
+function resetSim(){
+  clearInterval(timer); running=false; deadlocked=false;
+  N=+document.getElementById('selN').value;
+  numP=+document.getElementById('selP').value;
+  numC=+document.getElementById('selC').value;
+  buf=new Array(N).fill(null); head=0; tail=0; count=0; tick=0;
+  semEmpty=N; semFull=0; semMutex=1;
+  producers=Array.from({length:numP},(_,i)=>makeProducer(i+1));
+  consumers=Array.from({length:numC},(_,i)=>makeConsumer(i+1));
+  document.getElementById('btnPlay').textContent='▶ Play';
+  document.getElementById('deadlockBanner').classList.remove('visible');
+  document.getElementById('traceLog').innerHTML='';
+  render();
+}
+
+function setMode(m){
+  mode=m;
+  document.querySelectorAll('.btn-mode').forEach(b=>b.classList.remove('active'));
+  document.getElementById('mode-'+m).classList.add('active');
+  resetSim();
+}
+
+function togglePlay(){
+  if(running){ clearInterval(timer); running=false; document.getElementById('btnPlay').textContent='▶ Play'; }
+  else { running=true; document.getElementById('btnPlay').textContent='⏸ Pause'; timer=setInterval(step,getSpeed()); }
+}
+
+function log(msg,cls=''){
+  const d=document.getElementById('traceLog');
+  const e=document.createElement('div');
+  e.className='trace-entry'+(cls?' '+cls:'');
+  e.innerHTML=`<span class="ts">t=${tick}</span>${msg}`;
+  d.prepend(e);
+  if(d.children.length>200) d.removeChild(d.lastChild);
+}
+
+function stepProducer(p){
+  const slow= mode==='starvation'?0.3:1;
+  switch(p.state){
+    case 'producing':
+      if(Math.random()<0.4*slow){ p.item=Math.floor(Math.random()*99)+1; p.state='p_wait_empty'; }
+      break;
+    case 'p_wait_empty':
+      if(mode==='deadlock'){
+        // wrong order: mutex first
+        if(semMutex>0){ semMutex--; p.held_mutex=true; p.state='p_wait_empty2'; log(`P${p.id} <span class="op op-wait">P(mutex)</span> → mutex=${semMutex}`); }
+      } else {
+        if(semEmpty>0){ semEmpty--; p.state='p_wait_mutex'; log(`P${p.id} <span class="op op-wait">P(empty)</span> → empty=${semEmpty}`); }
+      }
+      break;
+    case 'p_wait_empty2': // deadlock mode: now wait for empty
+      if(semEmpty>0){ semEmpty--; p.state='p_wait_mutex_skip'; log(`P${p.id} <span class="op op-wait">P(empty)</span> → empty=${semEmpty}`); }
+      break;
+    case 'p_wait_mutex_skip':
+      p.state='inserting'; break;
+    case 'p_wait_mutex':
+      if(mode==='nosync'){ p.state='inserting'; break; }
+      if(semMutex>0){ semMutex--; p.held_mutex=true; p.state='inserting'; log(`P${p.id} <span class="op op-wait">P(mutex)</span> → mutex=${semMutex}`); }
+      break;
+    case 'inserting':
+      if(mode==='nosync'){
+        // no sync: may corrupt
+        buf[head]=p.item; head=(head+1)%N; count=Math.min(count+1,N);
+        log(`P${p.id} inserts ${p.item} (NO SYNC — count=${count})`);
+      } else {
+        buf[head]=p.item; head=(head+1)%N; count++;
+        if(!mode==='deadlock' || !mode==='p_wait_empty2') semMutex++; p.held_mutex=false;
+        semMutex=Math.min(semMutex+(p.held_mutex?0:0),semMutex); // already counted
+        // fix: V(mutex) then V(full)
+        if(p.held_mutex){ semMutex++; p.held_mutex=false; }
+        semFull++;
+        log(`P${p.id} <span class="op op-post">inserts ${p.item}</span> at [${(head-1+N)%N}] · V(mutex)=${semMutex} · V(full)=${semFull}`);
+      }
+      p.state='producing';
+      break;
+  }
+}
+
+function stepConsumer(c){
+  const slow= mode==='starvation'?3:1;
+  switch(c.state){
+    case 'consuming':
+      if(Math.random()<(0.4/slow)){ c.state='c_wait_full'; }
+      break;
+    case 'c_wait_full':
+      if(mode==='nosync'){ c.state='removing'; break; }
+      if(semFull>0){ semFull--; c.state='c_wait_mutex'; log(`C${c.id} <span class="op op-wait">P(full)</span> → full=${semFull}`); }
+      break;
+    case 'c_wait_mutex':
+      if(mode==='nosync'){ c.state='removing'; break; }
+      if(semMutex>0){ semMutex--; c.held_mutex=true; c.state='removing'; log(`C${c.id} <span class="op op-wait">P(mutex)</span> → mutex=${semMutex}`); }
+      break;
+    case 'removing':
+      if(mode==='nosync'){
+        c.item=buf[tail]||0; buf[tail]=null; tail=(tail+1)%N; count=Math.max(count-1,0);
+        log(`C${c.id} removes (NO SYNC — count=${count})`);
+      } else {
+        c.item=buf[tail]; buf[tail]=null; tail=(tail+1)%N; count--;
+        if(c.held_mutex){ semMutex++; c.held_mutex=false; }
+        semEmpty++;
+        log(`C${c.id} <span class="op op-post">removes ${c.item}</span> from [${(tail-1+N)%N}] · V(mutex)=${semMutex} · V(empty)=${semEmpty}`);
+      }
+      c.state='consuming';
+      break;
+  }
+}
+
+function checkDeadlock(){
+  if(deadlocked) return;
+  // Deadlock: all producers waiting for empty/mutex AND consumer waiting for mutex with mutex=0
+  const allPWaiting=producers.every(p=>p.state==='p_wait_empty2'||p.state==='p_wait_empty'||p.state==='p_wait_mutex');
+  const allCWaiting=consumers.every(c=>c.state==='c_wait_full'||c.state==='c_wait_mutex');
+  const mutexHeld=producers.some(p=>p.held_mutex)||consumers.some(c=>c.held_mutex);
+  if(allPWaiting&&allCWaiting&&mutexHeld&&semMutex===0){
+    deadlocked=true;
+    clearInterval(timer); running=false; document.getElementById('btnPlay').textContent='▶ Play';
+    const holder=producers.find(p=>p.held_mutex)||consumers.find(c=>c.held_mutex);
+    const who=holder?(holder.id?`P${holder.id}`:`C${holder.id}`):'?';
+    document.getElementById('deadlockBanner').className='deadlock-banner visible';
+    document.getElementById('deadlockBanner').innerHTML=
+      `🔴 <strong>Deadlock Detected!</strong> — ${who} holds <code>mutex</code> and is blocked. ` +
+      `All other threads are blocked on semaphores. The system cannot progress.<br>` +
+      `<em>Root cause: P(mutex) called before P(empty) — producer holds mutex, consumer needs mutex, neither can proceed.</em>`;
+    log(`<span class="op op-deadlock">DEADLOCK DETECTED — circular wait on mutex + full/empty</span>`,'op-deadlock');
+  }
+}
+
+function step(){
+  if(deadlocked) return;
+  tick++;
+  // interleave threads
+  const all=[...producers.map(p=>({type:'p',t:p})),...consumers.map(c=>({type:'c',t:c}))];
+  all.sort(()=>Math.random()-0.5);
+  for(const {type,t} of all){
+    if(type==='p') stepProducer(t);
+    else stepConsumer(t);
+  }
+  if(mode==='deadlock') checkDeadlock();
+  render();
+}
+
+function render(){
+  // buffer
+  document.getElementById('bufferTitle').textContent=`Buffer (N=${N})`;
+  const slots=document.getElementById('bufferSlots');
+  slots.innerHTML='';
+  for(let i=0;i<N;i++){
+    const s=document.createElement('div');
+    s.className='slot '+(buf[i]!==null?'filled':'empty');
+    if(i===head) s.classList.add('active-in');
+    if(i===tail&&buf[tail]!==null) s.classList.add('active-out');
+    s.textContent=buf[i]!==null?buf[i]:'';
+    slots.appendChild(s);
+  }
+  // sems
+  document.getElementById('semEmpty').textContent=semEmpty;
+  document.getElementById('semFull').textContent=semFull;
+  document.getElementById('semMutex').textContent=semMutex;
+  const mc=document.getElementById('semMutexCard');
+  mc.className='sem-card sem-mutex'+(semMutex===0?' locked':'');
+  // producer cards
+  const pc=document.getElementById('producerCol');
+  pc.innerHTML='<div style="font-size:0.7rem;color:#94a3b8;margin-bottom:4px">Producers</div>';
+  for(const p of producers){
+    const d=document.createElement('div'); d.className='thread-card';
+    let cls='status-idle',txt='';
+    switch(p.state){
+      case 'producing': cls='status-producing'; txt='Producing...'; break;
+      case 'p_wait_empty': cls='status-waiting'; txt='Waiting P(empty)'; break;
+      case 'p_wait_empty2': cls='status-waiting'; txt=deadlocked?'DEADLOCKED':'Waiting P(empty)'; if(deadlocked)cls='status-deadlocked'; break;
+      case 'p_wait_mutex': cls='status-waiting'; txt='Waiting P(mutex)'; break;
+      case 'p_wait_mutex_skip': cls='status-waiting'; txt='Waiting P(mutex)'; break;
+      case 'inserting': cls='status-inserting'; txt=`Inserting ${p.item}`; break;
+    }
+    d.innerHTML=`<div class="name">P${p.id}</div><div class="status ${cls}">${txt}</div>`;
+    pc.appendChild(d);
+  }
+  // consumer cards
+  const cc=document.getElementById('consumerCol');
+  cc.innerHTML='<div style="font-size:0.7rem;color:#94a3b8;margin-bottom:4px">Consumers</div>';
+  for(const c of consumers){
+    const d=document.createElement('div'); d.className='thread-card';
+    let cls='status-idle',txt='';
+    switch(c.state){
+      case 'consuming': cls='status-consuming'; txt='Consuming...'; break;
+      case 'c_wait_full': cls='status-waiting'; txt='Waiting P(full)'; break;
+      case 'c_wait_mutex': cls='status-waiting'; txt=deadlocked?'DEADLOCKED':'Waiting P(mutex)'; if(deadlocked)cls='status-deadlocked'; break;
+      case 'removing': cls='status-removing'; txt=`Removing ${c.item}`; break;
+    }
+    d.innerHTML=`<div class="name">C${c.id}</div><div class="status ${cls}">${txt}</div>`;
+    cc.appendChild(d);
+  }
+}
+
+// Init
+resetSim();
+</script>
+</body>
+</html>

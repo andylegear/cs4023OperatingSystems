@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CS4023 — Condition Variable Quiz</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+  header{background:#1e293b;padding:14px 24px;border-bottom:2px solid #334155;display:flex;align-items:center;gap:16px}
+  header h1{font-size:1.1rem;font-weight:700;color:#f1f5f9}
+  header span{font-size:0.82rem;color:#94a3b8}
+  /* Tabs */
+  .tabs{display:flex;gap:0;border-bottom:2px solid #334155}
+  .tab{padding:10px 22px;font-size:0.9rem;font-weight:600;cursor:pointer;color:#64748b;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s}
+  .tab.active{color:#3b82f6;border-bottom-color:#3b82f6}
+  .tab-content{display:none;padding:20px}
+  .tab-content.active{display:block}
+  /* Code */
+  pre{background:#1e1e1e;border:1px solid #334155;border-radius:8px;padding:14px 16px;font-family:'Courier New',monospace;font-size:0.82rem;line-height:1.5;overflow-x:auto;margin:10px 0}
+  .hl-kw{color:#569cd6}
+  .hl-cm{color:#6a9955}
+  .hl-str{color:#ce9178}
+  .hl-fn{color:#dcdcaa}
+  .hl-var{color:#9cdcfe}
+  .hl-num{color:#b5cea8}
+  .hl-bug{background:#7f1d1d;color:#fca5a5;border-radius:3px;padding:0 2px}
+  /* Questions */
+  .question{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:16px 18px;margin-bottom:14px}
+  .question h3{font-size:0.9rem;font-weight:700;margin-bottom:8px;color:#f1f5f9}
+  .question p{font-size:0.85rem;color:#cbd5e1;margin-bottom:10px;line-height:1.5}
+  select.q-select{background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 10px;font-size:0.85rem;width:100%;max-width:480px;cursor:pointer}
+  .feedback{margin-top:8px;padding:8px 12px;border-radius:6px;font-size:0.82rem;display:none}
+  .feedback.correct{background:#14532d;color:#86efac;border:1px solid #166534;display:block}
+  .feedback.incorrect{background:#7f1d1d;color:#fca5a5;border:1px solid #991b1b;display:block}
+  /* Buttons */
+  button{cursor:pointer;border:none;border-radius:6px;padding:7px 16px;font-size:0.85rem;font-weight:600;transition:background .15s}
+  .btn-primary{background:#3b82f6;color:#fff}
+  .btn-primary:hover{background:#2563eb}
+  .btn-secondary{background:#334155;color:#e2e8f0}
+  .btn-signal{background:#1d4ed8;color:#fff}
+  .btn-broadcast{background:#7e22ce;color:#fff}
+  .btn-signal:hover{background:#1e40af}
+  .btn-broadcast:hover{background:#6b21a8}
+  .btn-disabled{background:#1e293b;color:#475569;cursor:not-allowed}
+  /* Score */
+  .score-badge{display:inline-block;background:#1e293b;border:1px solid #334155;border-radius:6px;padding:4px 12px;font-size:0.8rem;color:#94a3b8;margin-bottom:12px}
+  .score-badge span{font-weight:700;color:#f1f5f9}
+  /* Fill-in */
+  .code-fill{position:relative}
+  .blank{background:#0f172a;border:1px solid #3b82f6;border-radius:4px;padding:2px 4px;font-family:'Courier New',monospace;font-size:0.82rem;color:#93c5fd;cursor:pointer;display:inline-block}
+  .blank.correct-blank{border-color:#22c55e;color:#86efac;background:#14532d}
+  .blank.wrong-blank{border-color:#ef4444;color:#fca5a5;background:#7f1d1d}
+  .fill-select{background:#0f172a;color:#e2e8f0;border:1px solid #3b82f6;border-radius:4px;padding:2px 4px;font-family:'Courier New',monospace;font-size:0.82rem}
+  /* Sim output */
+  .sim-output{background:#1e1e1e;border:1px solid #334155;border-radius:8px;padding:12px 16px;font-family:'Courier New',monospace;font-size:0.78rem;line-height:1.6;height:200px;overflow-y:auto;color:#d4d4d4}
+</style>
+</head>
+<body>
+<header>
+  <h1>CS4023 — Condition Variable Quiz</h1>
+  <span>L8.2 · Monitors and Condition Variables</span>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab(0)">1 · Spot the Bug</div>
+  <div class="tab" onclick="switchTab(1)">2 · Signal vs Broadcast</div>
+  <div class="tab" onclick="switchTab(2)">3 · Complete the Monitor</div>
+</div>
+
+<!-- TAB 1: Spot the Bug -->
+<div class="tab-content active" id="tab0">
+  <div class="score-badge">Score: <span id="score1">0</span> / 4</div>
+
+  <!-- Q1 -->
+  <div class="question" id="q1">
+    <h3>Q1 — What is the bug?</h3>
+    <pre><span class="hl-cm">/* Consumer */</span>
+<span class="hl-fn">pthread_mutex_lock</span>(&mutex);
+<span class="hl-kw">if</span> (count == <span class="hl-num">0</span>)                    <span class="hl-cm">/* ← check condition */</span>
+    <span class="hl-fn">pthread_cond_wait</span>(&not_empty, &mutex);
+item = buffer[out];                 <span class="hl-cm">/* use buffer */</span>
+out = (out + <span class="hl-num">1</span>) % N;
+count--;
+<span class="hl-fn">pthread_cond_signal</span>(&not_full);
+<span class="hl-fn">pthread_mutex_unlock</span>(&mutex);</pre>
+    <select class="q-select" onchange="checkBug(1,this.value)">
+      <option value="">— Select the bug —</option>
+      <option value="a">Uses `if` instead of `while` — spurious wakeup can bypass the check</option>
+      <option value="b">Calls pthread_cond_wait without holding the mutex</option>
+      <option value="c">Signals not_full instead of not_empty</option>
+      <option value="d">count-- should be before pthread_cond_signal</option>
+    </select>
+    <div class="feedback" id="fb1"></div>
+  </div>
+
+  <!-- Q2 -->
+  <div class="question" id="q2">
+    <h3>Q2 — What is the bug?</h3>
+    <pre><span class="hl-cm">/* Producer — BAD version */</span>
+<span class="hl-fn">pthread_mutex_unlock</span>(&mutex);      <span class="hl-cm">/* ← unlocked before wait? */</span>
+<span class="hl-kw">while</span> (count == N)
+    <span class="hl-fn">pthread_cond_wait</span>(&not_full, &mutex);
+buffer[in] = item;
+in = (in + <span class="hl-num">1</span>) % N;
+count++;
+<span class="hl-fn">pthread_cond_signal</span>(&not_empty);
+<span class="hl-fn">pthread_mutex_unlock</span>(&mutex);</pre>
+    <select class="q-select" onchange="checkBug(2,this.value)">
+      <option value="">— Select the bug —</option>
+      <option value="a">Missing pthread_mutex_lock — cond_wait is called without holding the mutex</option>
+      <option value="b">The while loop should be an if statement</option>
+      <option value="c">Should signal not_full, not not_empty</option>
+      <option value="d">count++ should happen before cond_wait returns</option>
+    </select>
+    <div class="feedback" id="fb2"></div>
+  </div>
+
+  <!-- Q3 -->
+  <div class="question" id="q3">
+    <h3>Q3 — What is the bug?</h3>
+    <pre><span class="hl-cm">/* Producer — signalling after unlock */</span>
+<span class="hl-fn">pthread_mutex_lock</span>(&mutex);
+<span class="hl-kw">while</span> (count == N)
+    <span class="hl-fn">pthread_cond_wait</span>(&not_full, &mutex);
+buffer[in] = item;
+in = (in + <span class="hl-num">1</span>) % N;
+count++;
+<span class="hl-fn">pthread_mutex_unlock</span>(&mutex);      <span class="hl-cm">/* unlock first */</span>
+<span class="hl-fn">pthread_cond_signal</span>(&not_empty);   <span class="hl-cm">/* ← signal after unlock */</span></pre>
+    <select class="q-select" onchange="checkBug(3,this.value)">
+      <option value="">— Select the bug —</option>
+      <option value="a">pthread_cond_signal is called after releasing the mutex — introduces a race window where the woken thread may find the condition already false</option>
+      <option value="b">Should use pthread_cond_broadcast instead of pthread_cond_signal</option>
+      <option value="c">Missing pthread_mutex_unlock before the return</option>
+      <option value="d">The while condition should be count == 0 not count == N</option>
+    </select>
+    <div class="feedback" id="fb3"></div>
+  </div>
+
+  <!-- Q4 -->
+  <div class="question" id="q4">
+    <h3>Q4 — What is the bug?</h3>
+    <pre><span class="hl-cm">/* Barrier — N threads must all arrive before any proceeds */</span>
+<span class="hl-fn">pthread_mutex_lock</span>(&m);
+arrived++;
+<span class="hl-kw">if</span> (arrived == N)
+    <span class="hl-fn">pthread_cond_signal</span>(&barrier_ready);  <span class="hl-cm">/* ← wake one */</span>
+<span class="hl-kw">while</span> (arrived < N)
+    <span class="hl-fn">pthread_cond_wait</span>(&barrier_ready, &m);
+<span class="hl-fn">pthread_mutex_unlock</span>(&m);</pre>
+    <select class="q-select" onchange="checkBug(4,this.value)">
+      <option value="">— Select the bug —</option>
+      <option value="a">Should use pthread_cond_broadcast — signal only wakes one thread; remaining N-2 threads stay blocked forever</option>
+      <option value="b">The if around signal should be a while loop</option>
+      <option value="c">Missing pthread_mutex_lock before incrementing arrived</option>
+      <option value="d">arrived++ is a data race — needs an atomic increment</option>
+    </select>
+    <div class="feedback" id="fb4"></div>
+  </div>
+</div>
+
+<!-- TAB 2: Signal vs Broadcast -->
+<div class="tab-content" id="tab1">
+  <div class="score-badge">Score: <span id="score2">0</span> / 5</div>
+  <p style="font-size:0.82rem;color:#94a3b8;margin-bottom:14px">
+    For each scenario, choose <strong>cond_signal</strong> (wakes one waiter) or <strong>cond_broadcast</strong> (wakes all waiters).
+  </p>
+  <div id="svbContainer"></div>
+</div>
+
+<!-- TAB 3: Complete the Monitor -->
+<div class="tab-content" id="tab2">
+  <p style="font-size:0.82rem;color:#94a3b8;margin-bottom:12px">Fill in the 8 blanks [B1]–[B8] in this bounded-buffer monitor. Then click <strong>Check All</strong>.</p>
+  <pre id="monitorCode"></pre>
+  <div style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap">
+    <button class="btn-primary" onclick="checkMonitor()">Check All</button>
+    <button class="btn-secondary" onclick="showSolution()">Show Solution</button>
+    <button class="btn-secondary" id="btnSim" onclick="runSimulation()" disabled>▶ Simulate</button>
+  </div>
+  <div id="monitorFeedback" style="margin-bottom:10px;font-size:0.82rem"></div>
+  <div class="sim-output" id="simOutput" style="display:none"></div>
+</div>
+
+<script>
+// === Tab switching ===
+function switchTab(i){
+  document.querySelectorAll('.tab').forEach((t,j)=>t.className='tab'+(i===j?' active':''));
+  document.querySelectorAll('.tab-content').forEach((t,j)=>t.className='tab-content'+(i===j?' active':''));
+}
+
+// === TAB 1: Spot the Bug ===
+const bugAnswers={1:'a',2:'a',3:'a',4:'a'};
+const bugExplanations={
+  1:'Correct! Using <code>if</code> instead of <code>while</code> is dangerous because of <strong>spurious wakeups</strong> — POSIX allows pthread_cond_wait() to return without a matching signal(). With <code>if</code>, the thread proceeds even though <code>count</code> may still be 0, accessing an empty buffer.',
+  2:'Correct! <code>pthread_cond_wait()</code> MUST be called with the mutex already held. The function atomically releases the mutex and blocks. Without the lock, another thread could change the condition between the check and the wait — a classic TOCTOU race.',
+  3:'Correct! Signalling after releasing the mutex creates a race window: the woken thread could be pre-empted between unlock and signal; another thread could acquire the mutex and consume the item before the signalled consumer runs. Always signal <em>before</em> unlock (or with the lock held).',
+  4:'Correct! <code>pthread_cond_signal()</code> wakes exactly <strong>one</strong> thread. In a barrier where N threads are all waiting, only one is released — the other N−2 wait forever. <code>pthread_cond_broadcast()</code> wakes all, allowing them all to pass the barrier.'
+};
+const bugHints={
+  1:'Hint: think about what happens if pthread_cond_wait() returns spuriously (without a signal).',
+  2:'Hint: read the POSIX spec — "The caller must hold the mutex when calling pthread_cond_wait."',
+  3:'Hint: is there a window between releasing the mutex and signalling where the condition could change?',
+  4:'Hint: how many threads are waiting on the barrier condition? How many does signal() wake?'
+};
+let scores1=new Array(4).fill(false);
+
+function checkBug(q,val){
+  if(!val) return;
+  const fb=document.getElementById('fb'+q);
+  if(val===bugAnswers[q]){
+    fb.className='feedback correct';
+    fb.innerHTML='✅ '+bugExplanations[q];
+    if(!scores1[q-1]){ scores1[q-1]=true; document.getElementById('score1').textContent=scores1.filter(Boolean).length; }
+  } else {
+    fb.className='feedback incorrect';
+    fb.innerHTML='❌ '+bugHints[q];
+  }
+}
+
+// === TAB 2: Signal vs Broadcast ===
+const svbData=[
+  {q:'One producer thread, one consumer thread, one condition variable <code>not_empty</code>. The producer inserts an item and wants to wake the consumer.',correct:'signal',
+   why:'With only <em>one</em> waiting thread, <code>signal</code> is correct and more efficient — it wakes exactly the one consumer that is waiting.'},
+  {q:'A reader-writer lock: multiple readers are blocked waiting for a writer to release the lock. The writer finishes and wants all blocked readers to proceed.',correct:'broadcast',
+   why:'Multiple readers are waiting and <em>all</em> can proceed now (readers share access). Use <code>broadcast</code> to wake all of them.'},
+  {q:'A task queue: one work item becomes available in a pool of N worker threads all waiting on <code>task_ready</code>.',correct:'signal',
+   why:'Only <em>one</em> worker can take the task. Use <code>signal</code> — waking all N would cause N−1 threads to re-block immediately (unnecessary wake overhead).'},
+  {q:'A barrier: all N threads must reach a checkpoint before any can continue. The Nth thread arrives and wants to release all the others.',correct:'broadcast',
+   why:'<em>All</em> N−1 threads are waiting at the barrier and all must proceed. <code>broadcast</code> wakes every waiter; each re-checks <code>arrived == N</code> and proceeds.'},
+  {q:'A resource pool: one resource slot becomes available. Multiple threads are waiting for <em>any</em> slot to become free.',correct:'signal',
+   why:'Only one resource slot is available — only one waiting thread can take it. Using <code>broadcast</code> would wake all waiters, but all but one would immediately re-block.'}
+];
+let scores2=new Array(5).fill(false);
+
+function buildSvb(){
+  const c=document.getElementById('svbContainer');
+  svbData.forEach((item,i)=>{
+    const d=document.createElement('div');
+    d.className='question'; d.id='svb'+i;
+    d.innerHTML=`<h3>Scenario ${i+1}</h3><p>${item.q}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-signal" onclick="checkSvb(${i},'signal')">cond_signal</button>
+        <button class="btn-broadcast" onclick="checkSvb(${i},'broadcast')">cond_broadcast</button>
+      </div>
+      <div class="feedback" id="svbfb${i}"></div>`;
+    c.appendChild(d);
+  });
+}
+
+function checkSvb(i,choice){
+  const item=svbData[i];
+  const fb=document.getElementById('svbfb'+i);
+  if(choice===item.correct){
+    fb.className='feedback correct';
+    fb.innerHTML=`✅ <strong>${choice}</strong> is correct — ${item.why}`;
+    if(!scores2[i]){ scores2[i]=true; document.getElementById('score2').textContent=scores2.filter(Boolean).length; }
+  } else {
+    fb.className='feedback incorrect';
+    fb.innerHTML=`❌ <strong>${choice}</strong> is not ideal here — ${item.why}`;
+  }
+}
+
+// === TAB 3: Monitor Fill-in ===
+// Answers: B1=lock, B2=while, B3=count==N, B4=wait(not_full), B5=signal(not_empty), B6=unlock,
+//          B7=while, B8=count==0, B9=wait(not_empty), B10... let's do 8 blanks
+const blanks=[
+  {id:'B1',options:['pthread_mutex_lock(&mutex)','pthread_mutex_unlock(&mutex)','pthread_cond_wait(&not_full,&mutex)','pthread_cond_signal(&not_full)'],answer:'pthread_mutex_lock(&mutex)'},
+  {id:'B2',options:['while','if','for','do'],answer:'while'},
+  {id:'B3',options:['count == N','count == 0','count > 0','count < N'],answer:'count == N'},
+  {id:'B4',options:['pthread_cond_wait(&not_full, &mutex)','pthread_cond_wait(&not_empty, &mutex)','pthread_cond_signal(&not_full)','pthread_mutex_lock(&mutex)'],answer:'pthread_cond_wait(&not_full, &mutex)'},
+  {id:'B5',options:['pthread_cond_signal(&not_empty)','pthread_cond_signal(&not_full)','pthread_cond_broadcast(&not_empty)','pthread_mutex_unlock(&mutex)'],answer:'pthread_cond_signal(&not_empty)'},
+  {id:'B6',options:['pthread_mutex_unlock(&mutex)','pthread_mutex_lock(&mutex)','pthread_cond_signal(&not_full)','pthread_cond_wait(&not_full,&mutex)'],answer:'pthread_mutex_unlock(&mutex)'},
+  {id:'B7',options:['while','if','for','do'],answer:'while'},
+  {id:'B8',options:['count == 0','count == N','count > 0','count < 0'],answer:'count == 0'},
+];
+
+function buildMonitor(){
+  const lines=[
+    `<span class="hl-kw">void</span> *<span class="hl-fn">producer</span>(<span class="hl-kw">void</span> *arg) {`,
+    `    <span class="hl-kw">int</span> item = <span class="hl-fn">rand</span>() % <span class="hl-num">100</span>;`,
+    `    <BLANK id="B1">                                    <span class="hl-cm">/* [B1] acquire mutex */</span>`,
+    `    <BLANK id="B2"> (count == N)                        <span class="hl-cm">/* [B2] loop keyword */</span>`,
+    `        <BLANK id="B4">;    <span class="hl-cm">/* [B4] wait on condition */</span>`,
+    `    buffer[in] = item; in = (in + <span class="hl-num">1</span>) % N; count++;`,
+    `    <BLANK id="B5">;  <span class="hl-cm">/* [B5] signal condition */</span>`,
+    `    <BLANK id="B6">;                               <span class="hl-cm">/* [B6] release mutex */</span>`,
+    `    <span class="hl-kw">return</span> NULL;`,
+    `}`,
+    ``,
+    `<span class="hl-kw">void</span> *<span class="hl-fn">consumer</span>(<span class="hl-kw">void</span> *arg) {`,
+    `    <span class="hl-kw">int</span> item;`,
+    `    <span class="hl-fn">pthread_mutex_lock</span>(&mutex);`,
+    `    <BLANK id="B7"> (<BLANK id="B8">)          <span class="hl-cm">/* [B7],[B8] loop + condition */</span>`,
+    `        <span class="hl-fn">pthread_cond_wait</span>(&not_empty, &mutex);`,
+    `    item = buffer[out]; out = (out + <span class="hl-num">1</span>) % N; count--;`,
+    `    <span class="hl-fn">pthread_cond_signal</span>(&not_full);`,
+    `    <span class="hl-fn">pthread_mutex_unlock</span>(&mutex);`,
+    `    <span class="hl-kw">return</span> NULL;`,
+    `}`
+  ];
+
+  // Build selects in the lines
+  let html=lines.join('\n');
+  for(const b of blanks){
+    const opts=b.options.map(o=>`<option value="${o}"${o===b.answer?'':''}>    ${o}</option>`).join('');
+    const sel=`<select class="fill-select" id="sel_${b.id}" onchange="updateBlank('${b.id}',this.value)"><option value="">[ ${b.id} ]</option>${opts}</select>`;
+    html=html.replace(new RegExp(`<BLANK id="${b.id}">`),'');
+    // simpler: replace placeholder text
+  }
+
+  // Rebuild with actual selects
+  let code=`<span class="hl-kw">void</span> *<span class="hl-fn">producer</span>(<span class="hl-kw">void</span> *arg) {\n`;
+  code+=`    <span class="hl-kw">int</span> item = <span class="hl-fn">rand</span>() % <span class="hl-num">100</span>;\n`;
+  code+=`    `+makeBlank('B1')+`  <span class="hl-cm">/* [B1] acquire mutex */</span>\n`;
+  code+=`    `+makeBlank('B2')+` (`+makeBlank('B3')+`)  <span class="hl-cm">/* [B2] loop · [B3] condition */</span>\n`;
+  code+=`        `+makeBlank('B4')+`;  <span class="hl-cm">/* [B4] wait */</span>\n`;
+  code+=`    buffer[in] = item; in = (in + <span class="hl-num">1</span>) % N; count++;\n`;
+  code+=`    `+makeBlank('B5')+`;  <span class="hl-cm">/* [B5] signal */</span>\n`;
+  code+=`    `+makeBlank('B6')+`;  <span class="hl-cm">/* [B6] release mutex */</span>\n`;
+  code+=`    <span class="hl-kw">return</span> NULL;\n}\n\n`;
+  code+=`<span class="hl-kw">void</span> *<span class="hl-fn">consumer</span>(<span class="hl-kw">void</span> *arg) {\n`;
+  code+=`    <span class="hl-kw">int</span> item;\n`;
+  code+=`    <span class="hl-fn">pthread_mutex_lock</span>(&mutex);\n`;
+  code+=`    `+makeBlank('B7')+` (`+makeBlank('B8')+`)  <span class="hl-cm">/* [B7] loop · [B8] condition */</span>\n`;
+  code+=`        <span class="hl-fn">pthread_cond_wait</span>(&not_empty, &mutex);\n`;
+  code+=`    item = buffer[out]; out = (out + <span class="hl-num">1</span>) % N; count--;\n`;
+  code+=`    <span class="hl-fn">pthread_cond_signal</span>(&not_full);\n`;
+  code+=`    <span class="hl-fn">pthread_mutex_unlock</span>(&mutex);\n`;
+  code+=`    <span class="hl-kw">return</span> NULL;\n}`;
+  document.getElementById('monitorCode').innerHTML=code;
+}
+
+function makeBlank(id){
+  const b=blanks.find(x=>x.id===id);
+  const opts=b.options.map(o=>`<option value="${o}">${o}</option>`).join('');
+  return `<select class="fill-select" id="sel_${id}"><option value="">[ ${id} ]</option>${opts}</select>`;
+}
+
+function checkMonitor(){
+  let correct=0;
+  const fb=[];
+  for(const b of blanks){
+    const sel=document.getElementById('sel_'+b.id);
+    if(!sel) continue;
+    const val=sel.value;
+    if(val===b.answer){
+      sel.className='fill-select correct-blank'; correct++;
+    } else {
+      sel.className='fill-select wrong-blank';
+      fb.push(`${b.id}: expected <code>${b.answer}</code>`);
+    }
+  }
+  const out=document.getElementById('monitorFeedback');
+  if(correct===blanks.length){
+    out.innerHTML='<span style="color:#86efac">✅ All correct! The monitor is complete. Click ▶ Simulate to see it in action.</span>';
+    document.getElementById('btnSim').disabled=false;
+    document.getElementById('btnSim').className='btn-primary';
+  } else {
+    out.innerHTML=`<span style="color:#fca5a5">❌ ${correct}/${blanks.length} correct. Wrong: ${fb.join(', ')}</span>`;
+  }
+}
+
+function showSolution(){
+  for(const b of blanks){
+    const sel=document.getElementById('sel_'+b.id);
+    if(sel){ sel.value=b.answer; sel.className='fill-select correct-blank'; }
+  }
+  document.getElementById('monitorFeedback').innerHTML=
+    '<span style="color:#fbbf24">Solution revealed. ' +
+    'Key rules: [B1] lock before touch; [B2,B7] <code>while</code> not <code>if</code> (spurious wakeups); ' +
+    '[B3] wait when full; [B4] wait on not_full; [B5] signal not_empty after insert; [B6] unlock last; [B8] wait when empty.</span>';
+  document.getElementById('btnSim').disabled=false;
+  document.getElementById('btnSim').className='btn-primary';
+}
+
+let simInterval=null;
+function runSimulation(){
+  document.getElementById('simOutput').style.display='block';
+  const out=document.getElementById('simOutput');
+  out.innerHTML='';
+  let buf=new Array(5).fill(null),head=0,tail=0,count=0,t=0;
+  const lines=[];
+  function log(s){lines.push(s);}
+  const N=5,ITEMS=12;
+  let pDone=0,cDone=0;
+  function addLine(l){
+    const d=document.createElement('div');
+    d.textContent=l; out.appendChild(d);
+    out.scrollTop=out.scrollHeight;
+  }
+  clearInterval(simInterval);
+  let pc=0,cc=0;
+  simInterval=setInterval(()=>{
+    t++;
+    if(pc<ITEMS&&count<N){ buf[head]=pc+1;head=(head+1)%N;count++;addLine(`t=${t} [Producer] locked → inserted item ${pc+1} → count=${count} → signalled not_empty → unlocked`);pc++; }
+    else if(cc<ITEMS&&count>0){ const it=buf[tail];buf[tail]=null;tail=(tail+1)%N;count--;addLine(`t=${t} [Consumer] locked → removed item ${it} → count=${count} → signalled not_full → unlocked`);cc++; }
+    else if(pc<ITEMS){ addLine(`t=${t} [Producer] locked → count==${N} → wait(not_full)...`); }
+    else if(cc<ITEMS){ addLine(`t=${t} [Consumer] locked → count==0 → wait(not_empty)...`); }
+    if(pc===ITEMS&&cc===ITEMS){ clearInterval(simInterval); addLine(`✅ Done — ${ITEMS} items produced and consumed correctly.`); }
+    if(t>60){ clearInterval(simInterval); addLine('(simulation ended)'); }
+  },250);
+}
+
+// Init
+buildSvb();
+buildMonitor();
+</script>
+</body>
+</html>
