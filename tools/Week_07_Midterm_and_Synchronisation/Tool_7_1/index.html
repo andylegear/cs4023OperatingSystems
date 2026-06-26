@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CS4023 Tool 7.1 — Race Condition Demo</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0f0f1a;color:#e0e0e0;font-family:'Segoe UI',sans-serif;min-height:100vh;padding:16px}
+h1{text-align:center;font-size:1.3rem;color:#ff8c00;margin-bottom:4px}
+.subtitle{text-align:center;font-size:.8rem;color:#888;margin-bottom:14px}
+
+/* Controls */
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;margin-bottom:14px;background:#1a1a2e;padding:10px 14px;border-radius:10px}
+.controls label{font-size:.8rem;color:#aaa}
+.mode-btn{padding:5px 12px;border:2px solid #555;background:transparent;color:#ccc;border-radius:6px;cursor:pointer;font-size:.78rem;transition:all .2s}
+.mode-btn.active{border-color:#ff8c00;background:#2a1a00;color:#ff8c00}
+.ctrl-btn{padding:5px 14px;border:none;border-radius:6px;cursor:pointer;font-size:.8rem;font-weight:600}
+.btn-run{background:#ff8c00;color:#000}
+.btn-run:hover{background:#e07000}
+.btn-reset{background:#333;color:#ccc}
+.btn-reset:hover{background:#444}
+.btn-run10{background:#0070cc;color:#fff}
+.btn-run10:hover{background:#005baa}
+input[type=range]{width:110px;accent-color:#ff8c00}
+input[type=number]{width:64px;background:#1f1f2e;border:1px solid #444;color:#e0e0e0;padding:3px 6px;border-radius:4px;font-size:.8rem}
+
+/* Main layout */
+.main{display:grid;grid-template-columns:1fr 1fr 1fr auto 1fr;gap:10px;margin-bottom:14px}
+
+/* Thread panels */
+.thread{background:#1a1a2e;border:2px solid #333;border-radius:10px;padding:10px;text-align:center;transition:border-color .3s}
+.thread.t1{--col:#5b9bd5} .thread.t2{--col:#7dc87d} .thread.t3{--col:#c88ddc}
+.thread-label{font-size:.75rem;font-weight:700;color:var(--col);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.reg-val{font-size:1.2rem;font-weight:700;color:#e0e0e0;min-height:28px}
+.iter-count{font-size:.7rem;color:#888;margin-top:2px}
+.status-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.68rem;font-weight:600;margin-top:5px}
+.badge-running{background:#1a3a1a;color:#7dc87d;border:1px solid #3a6a3a}
+.badge-waiting{background:#3a2a00;color:#ff8c00;border:1px solid #6a5000}
+.badge-done{background:#1a1a3a;color:#888;border:1px solid #333}
+.lock-icon{font-size:1.1rem;margin-top:4px;min-height:24px}
+.step-label{font-size:.7rem;color:#aaa;margin-top:3px;min-height:16px;font-family:monospace}
+
+/* Shared counter */
+.shared-counter{background:#12122a;border:3px solid #ff8c00;border-radius:12px;padding:12px 8px;text-align:center;display:flex;flex-direction:column;justify-content:center}
+.counter-label{font-size:.7rem;color:#ff8c00;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.counter-value{font-size:2.8rem;font-weight:900;color:#fff;min-height:56px;transition:color .2s}
+.counter-value.flash-ok{color:#7dc87d}
+.counter-value.flash-bad{color:#e05050}
+.expected-label{font-size:.68rem;color:#888;margin-top:4px}
+
+/* Stats */
+.stats-panel{background:#1a1a2e;border:1px solid #333;border-radius:10px;padding:10px;font-size:.75rem;min-width:130px}
+.stats-title{color:#ff8c00;font-weight:600;margin-bottom:6px;font-size:.78rem}
+.stat-row{display:flex;justify-content:space-between;margin-bottom:3px;color:#ccc}
+.stat-val{color:#fff;font-weight:600}
+.run10-results{margin-top:8px;font-size:.7rem}
+.run10-bar{height:6px;background:#ff8c00;border-radius:2px;margin-bottom:2px;transition:width .3s}
+.run10-row{display:flex;align-items:center;gap:5px;margin-bottom:1px}
+.run10-val{color:#ccc;min-width:44px;font-family:monospace}
+
+/* Section divider */
+.section-title{font-size:.9rem;font-weight:700;color:#ff8c00;text-align:center;margin:10px 0 8px}
+
+/* Interleaving visualiser */
+.interleave-area{background:#1a1a2e;border:1px solid #444;border-radius:10px;padding:12px}
+.interleave-header{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.il-title{font-size:.85rem;font-weight:700;color:#e0e0e0;margin-right:4px}
+.il-desc{font-size:.74rem;color:#888;flex:1}
+.il-row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;margin-bottom:5px;cursor:grab;background:#12122a;border:1px solid #333;user-select:none;transition:background .2s}
+.il-row:active{cursor:grabbing}
+.il-row.dragging{opacity:.4}
+.il-row.drop-target{border-color:#ff8c00;background:#1f1a0a}
+.il-row.critical-window{border-color:#e05050 !important;background:#2a0a0a !important}
+.thread-tag{width:64px;font-size:.72rem;font-weight:700;text-align:center;padding:2px 4px;border-radius:4px}
+.tt1{background:#1a2e44;color:#5b9bd5} .tt2{background:#1a2e1a;color:#7dc87d}
+.il-instr{font-family:monospace;font-size:.78rem;color:#e0e0e0;flex:1}
+.il-result{font-size:.72rem;color:#ff8c00;min-width:80px;text-align:right}
+.il-drag-handle{color:#555;font-size:.85rem;cursor:grab;padding:0 2px}
+.il-eval-area{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.eval-result{font-size:.8rem;padding:4px 10px;border-radius:5px;font-weight:600}
+.eval-good{background:#1a3a1a;color:#7dc87d;border:1px solid #3a6a3a}
+.eval-bad{background:#3a0a0a;color:#e05050;border:1px solid #6a1a1a}
+
+/* Histogram */
+.hist{margin-top:8px}
+.hist-title{font-size:.72rem;color:#aaa;margin-bottom:4px}
+.hist-row{display:flex;align-items:center;gap:5px;margin-bottom:2px;font-size:.7rem;font-family:monospace}
+.hist-bar{height:10px;background:#0070cc;border-radius:2px;transition:width .4s}
+.hist-label{min-width:44px;color:#ccc}
+
+/* Progress bar */
+.progress-container{height:4px;background:#333;border-radius:2px;margin-top:6px}
+.progress-bar{height:4px;background:#ff8c00;border-radius:2px;transition:width .1s}
+</style>
+</head>
+<body>
+
+<h1>CS4023 Tool 7.1 — Race Condition Demonstrator</h1>
+<div class="subtitle">Critical Sections &amp; Synchronisation · CS4023 Operating Systems</div>
+
+<!-- Controls -->
+<div class="controls">
+  <div>
+    <label>Sync Mode:</label><br>
+    <div style="display:flex;gap:6px;margin-top:4px">
+      <button class="mode-btn active" id="modeNone" onclick="setMode('none')">No Sync</button>
+      <button class="mode-btn" id="modeMutex" onclick="setMode('mutex')">pthread_mutex</button>
+      <button class="mode-btn" id="modeAtomic" onclick="setMode('atomic')">Atomic (__sync)</button>
+    </div>
+  </div>
+  <div>
+    <label>Iterations per thread: <input type="number" id="iterInput" value="100" min="10" max="10000"></label><br>
+    <label style="margin-top:4px;display:block">Speed: Slow
+      <input type="range" id="speedSlider" min="1" max="5" value="3">
+      Fast
+    </label>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:6px">
+    <button class="ctrl-btn btn-run" id="runBtn" onclick="runSim()">▶ Run</button>
+    <button class="ctrl-btn btn-reset" onclick="resetSim()">↺ Reset</button>
+    <button class="ctrl-btn btn-run10" onclick="run10()">Run × 10</button>
+  </div>
+</div>
+
+<!-- Main simulation area -->
+<div class="main">
+  <!-- Thread 1 -->
+  <div class="thread t1" id="t1">
+    <div class="thread-label">Thread 1</div>
+    <div class="reg-val" id="t1reg">—</div>
+    <div class="step-label" id="t1step"></div>
+    <div class="lock-icon" id="t1lock"></div>
+    <div class="iter-count" id="t1iter">iter: 0</div>
+    <div><span class="status-badge badge-done" id="t1badge">IDLE</span></div>
+  </div>
+
+  <!-- Thread 2 -->
+  <div class="thread t2" id="t2">
+    <div class="thread-label">Thread 2</div>
+    <div class="reg-val" id="t2reg">—</div>
+    <div class="step-label" id="t2step"></div>
+    <div class="lock-icon" id="t2lock"></div>
+    <div class="iter-count" id="t2iter">iter: 0</div>
+    <div><span class="status-badge badge-done" id="t2badge">IDLE</span></div>
+  </div>
+
+  <!-- Thread 3 -->
+  <div class="thread t3" id="t3">
+    <div class="thread-label">Thread 3</div>
+    <div class="reg-val" id="t3reg">—</div>
+    <div class="step-label" id="t3step"></div>
+    <div class="lock-icon" id="t3lock"></div>
+    <div class="iter-count" id="t3iter">iter: 0</div>
+    <div><span class="status-badge badge-done" id="t3badge">IDLE</span></div>
+  </div>
+
+  <!-- Shared Counter -->
+  <div class="shared-counter">
+    <div class="counter-label">Shared Counter</div>
+    <div class="counter-value" id="counterDisplay">0</div>
+    <div class="expected-label" id="expectedLabel">Expected: 0</div>
+    <div class="progress-container"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
+    <div id="modeLabel" style="font-size:.68rem;color:#888;margin-top:5px">No Sync</div>
+    <div id="syncAnnotation" style="font-size:.7rem;color:#ff8c00;margin-top:3px;min-height:16px"></div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-panel">
+    <div class="stats-title">Statistics</div>
+    <div class="stat-row"><span>Expected:</span><span class="stat-val" id="statExpected">—</span></div>
+    <div class="stat-row"><span>Final:</span><span class="stat-val" id="statFinal">—</span></div>
+    <div class="stat-row"><span>Lost updates:</span><span class="stat-val" id="statLost">—</span></div>
+    <div class="stat-row"><span>Mode:</span><span class="stat-val" id="statMode">No Sync</span></div>
+    <div class="run10-results" id="run10Results"></div>
+  </div>
+</div>
+
+<!-- Interleaving Visualiser -->
+<div class="section-title">Instruction-Level Interleaving Visualiser</div>
+<div class="interleave-area">
+  <div class="interleave-header">
+    <span class="il-title">Drag rows to reorder the execution of two threads</span>
+    <span class="il-desc">Shows how a specific instruction interleaving causes a lost update. The critical window (between LOAD and STORE) is highlighted when a race exists.</span>
+    <button class="ctrl-btn btn-run" style="padding:4px 10px;font-size:.75rem" onclick="showRaceInterleave()">Show Race</button>
+    <button class="ctrl-btn btn-reset" style="padding:4px 10px;font-size:.75rem" onclick="showSafeInterleave()">Show Safe</button>
+  </div>
+
+  <div id="instrList"></div>
+
+  <div class="il-eval-area">
+    <button class="ctrl-btn btn-run" style="padding:4px 12px;font-size:.78rem" onclick="evaluateInterleave()">Evaluate</button>
+    <div id="evalResult" style="font-size:.8rem;color:#888">Reorder the instructions then click Evaluate.</div>
+  </div>
+</div>
+
+<!-- Histogram for Run×10 -->
+<div id="histSection" style="display:none;margin-top:12px">
+  <div class="section-title">Run × 10 Results</div>
+  <div id="histContainer" style="background:#1a1a2e;border:1px solid #333;border-radius:10px;padding:12px;max-width:500px;margin:0 auto"></div>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+let mode = 'none';      // 'none' | 'mutex' | 'atomic'
+let running = false;
+let simId = 0;          // cancel stale sims
+
+const THREADS = 3;
+let counter = 0;
+let mutex = false;      // mutex state (for animation)
+let mutexHolder = -1;   // thread index holding mutex
+
+function getIters() { return Math.max(10, Math.min(10000, parseInt(document.getElementById('iterInput').value)||100)); }
+function getDelay() {
+  const v = parseInt(document.getElementById('speedSlider').value);
+  return [0, 400, 200, 80, 25, 5][v];
+}
+
+function setMode(m) {
+  mode = m;
+  ['none','mutex','atomic'].forEach(x => document.getElementById('mode'+capitalize(x)).classList.toggle('active', x===m));
+  const labels = {none:'No Sync',mutex:'pthread_mutex',atomic:'Atomic (__sync)'};
+  document.getElementById('modeLabel').textContent = labels[m];
+  document.getElementById('statMode').textContent = labels[m];
+  resetSim();
+}
+function capitalize(s) { return s.charAt(0).toUpperCase()+s.slice(1); }
+
+// ─── Thread UI helpers ────────────────────────────────────────────────────────
+function setThreadUI(tid, reg, step, lock, iter, badge, badgeClass) {
+  document.getElementById('t'+(tid+1)+'reg').textContent = reg;
+  document.getElementById('t'+(tid+1)+'step').textContent = step;
+  document.getElementById('t'+(tid+1)+'lock').textContent = lock;
+  document.getElementById('t'+(tid+1)+'iter').textContent = 'iter: '+iter;
+  const b = document.getElementById('t'+(tid+1)+'badge');
+  b.textContent = badge;
+  b.className = 'status-badge '+badgeClass;
+}
+
+function flashCounter(good) {
+  const el = document.getElementById('counterDisplay');
+  el.classList.add(good ? 'flash-ok' : 'flash-bad');
+  setTimeout(() => { el.classList.remove('flash-ok','flash-bad'); }, 300);
+}
+
+function updateCounter(val, progress) {
+  document.getElementById('counterDisplay').textContent = val;
+  document.getElementById('progressBar').style.width = Math.min(100, progress)+'%';
+}
+
+// ─── Simulation ───────────────────────────────────────────────────────────────
+function resetSim() {
+  running = false; simId++;
+  counter = 0; mutex = false; mutexHolder = -1;
+  updateCounter(0, 0);
+  document.getElementById('expectedLabel').textContent = 'Expected: 0';
+  document.getElementById('syncAnnotation').textContent = '';
+  document.getElementById('statExpected').textContent = '—';
+  document.getElementById('statFinal').textContent = '—';
+  document.getElementById('statLost').textContent = '—';
+  for (let i=0;i<THREADS;i++) setThreadUI(i,'—','','',0,'IDLE','status-badge badge-done');
+  document.getElementById('runBtn').disabled = false;
+}
+
+async function runSim() {
+  if (running) return;
+  running = true; const myId = ++simId;
+  document.getElementById('runBtn').disabled = true;
+  counter = 0; mutex = false; mutexHolder = -1;
+  const iters = getIters();
+  const expected = THREADS * iters;
+  document.getElementById('expectedLabel').textContent = 'Expected: '+expected;
+  document.getElementById('statExpected').textContent = expected;
+  document.getElementById('statFinal').textContent = '…';
+  document.getElementById('statLost').textContent = '…';
+
+  // Each thread runs as an async task
+  const tasks = [];
+  for (let t=0;t<THREADS;t++) tasks.push(runThread(t, iters, myId));
+  await Promise.all(tasks);
+
+  if (simId !== myId) return;
+  const final = counter;
+  const lost = expected - final;
+  document.getElementById('statFinal').textContent = final;
+  document.getElementById('statLost').textContent = lost;
+  updateCounter(final, 100);
+  flashCounter(lost === 0);
+  for (let i=0;i<THREADS;i++) setThreadUI(i,'—','✓ Done','',iters,'DONE','status-badge badge-done');
+  document.getElementById('syncAnnotation').textContent = lost > 0 ? `⚠ ${lost} update(s) lost!` : '✓ All updates preserved';
+  document.getElementById('syncAnnotation').style.color = lost > 0 ? '#e05050' : '#7dc87d';
+  running = false;
+  document.getElementById('runBtn').disabled = false;
+}
+
+async function runThread(tid, iters, myId) {
+  const delay = getDelay();
+  const badgeColors = ['badge-running','badge-running','badge-running'];
+  const badgeClass = ['badge-running status-badge','badge-waiting status-badge','badge-done status-badge'];
+
+  for (let i=0;i<iters;i++) {
+    if (simId !== myId) return;
+
+    if (mode === 'mutex') {
+      // Wait for mutex
+      while (mutex && mutexHolder !== tid) {
+        setThreadUI(tid,'—','⏳ waiting lock','⏳',i,'WAIT','status-badge badge-waiting');
+        await sleep(Math.max(5, delay));
+        if (simId !== myId) return;
+      }
+      mutex = true; mutexHolder = tid;
+      document.getElementById('syncAnnotation').textContent = `Thread ${tid+1} holds mutex 🔒`;
+      setThreadUI(tid,'—','lock()','🔒',i,'LOCKED','status-badge badge-running');
+    } else if (mode === 'atomic') {
+      setThreadUI(tid,'—','LOCK XADD','⚛',i,'RUNNING','status-badge badge-running');
+    }
+
+    if (mode === 'none') {
+      // Simulate read-modify-write with possible race
+      const reg = counter;   // LOAD
+      setThreadUI(tid, reg, 'LOAD → reg='+reg,'',i,'RUNNING','status-badge badge-running');
+      if (delay > 0) await sleep(delay);
+      if (simId !== myId) return;
+
+      const newReg = reg + 1;   // ADD
+      setThreadUI(tid, newReg, 'ADD reg+1='+newReg,'',i,'RUNNING','status-badge badge-running');
+      if (delay > 30) await sleep(delay);
+      if (simId !== myId) return;
+
+      counter = newReg;   // STORE
+      setThreadUI(tid, newReg, 'STORE → counter='+counter,'',i,'RUNNING','status-badge badge-running');
+      updateCounter(counter, (i/iters)*100);
+    } else if (mode === 'mutex') {
+      const reg = counter;
+      setThreadUI(tid, reg, 'LOAD → reg='+reg,'🔒',i,'RUNNING','status-badge badge-running');
+      if (delay > 0) await sleep(delay);
+      counter = reg + 1;
+      setThreadUI(tid, counter, 'STORE → '+counter,'🔒',i,'RUNNING','status-badge badge-running');
+      updateCounter(counter, (i/iters)*100);
+      mutex = false; mutexHolder = -1;
+      document.getElementById('syncAnnotation').textContent = `Thread ${tid+1} released mutex 🔓`;
+      setThreadUI(tid,'—','unlock()','🔓',i,'RUNNING','status-badge badge-running');
+    } else {
+      // atomic
+      counter++;   // conceptually atomic
+      updateCounter(counter, (i/iters)*100);
+    }
+
+    if (delay > 0) await sleep(delay);
+  }
+}
+
+// ─── Run × 10 ─────────────────────────────────────────────────────────────────
+async function run10() {
+  if (running) return;
+  const iters = getIters();
+  const expected = THREADS * iters;
+  const results = [];
+
+  document.getElementById('run10Results').innerHTML = '<div style="color:#888;font-size:.72rem">Running…</div>';
+  document.getElementById('histSection').style.display = 'none';
+
+  for (let r=0;r<10;r++) {
+    let c = 0;
+    if (mode === 'none') {
+      // Simulate races probabilistically
+      const ops = [];
+      for (let t=0;t<THREADS;t++) for (let i=0;i<iters;i++) ops.push(t);
+      // Shuffle to simulate random interleaving
+      for (let i=ops.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1));[ops[i],ops[j]]=[ops[j],ops[i]]; }
+      const regs = new Array(THREADS).fill(0);
+      const loaded = new Array(THREADS).fill(false);
+      // Process in interleaved order: each op is LOAD or STORE
+      const steps = [];
+      for (const t of ops) { steps.push({t,phase:'LOAD'}); steps.push({t,phase:'STORE'}); }
+      let sharedC = 0;
+      // Simple race simulation: each iteration is a 3-step RMW
+      // Use a probabilistic model: ~20% chance of race on each iteration pair
+      for (let t=0;t<THREADS;t++) {
+        for (let i=0;i<iters;i++) {
+          if (Math.random() < 0.85 || mode !== 'none') { c++; }
+          else { /* lost update */ }
+        }
+      }
+    } else {
+      c = expected; // mutex and atomic always correct
+    }
+    results.push(c);
+  }
+
+  // Show histogram
+  const maxV = Math.max(...results);
+  const minV = Math.min(...results);
+  let histHtml = `<div class="hist-title">10 runs — Expected: ${expected} per run</div>`;
+  for (let r=0;r<10;r++) {
+    const pct = maxV > 0 ? Math.round((results[r]/maxV)*180) : 0;
+    const ok = results[r] === expected;
+    histHtml += `<div class="hist-row">
+      <span class="hist-label">Run ${r+1}: ${results[r]}</span>
+      <div style="height:10px;width:${pct}px;background:${ok?'#3a8a3a':'#cc4444'};border-radius:2px;transition:width .4s"></div>
+      <span style="font-size:.68rem;color:${ok?'#7dc87d':'#e05050'}">${ok?'✓':'✗ -'+(expected-results[r])}</span>
+    </div>`;
+  }
+  document.getElementById('histContainer').innerHTML = histHtml;
+  document.getElementById('histSection').style.display = 'block';
+  document.getElementById('run10Results').innerHTML = '';
+}
+
+// ─── Interleaving Visualiser ───────────────────────────────────────────────────
+const INSTRS_RACE = [
+  {tid:0,label:'Thread 1: LOAD counter → r1',step:'load'},
+  {tid:1,label:'Thread 2: LOAD counter → r2',step:'load'},
+  {tid:0,label:'Thread 1: ADD  r1, 1        (r1=old+1)',step:'add'},
+  {tid:1,label:'Thread 2: ADD  r2, 1        (r2=old+1)',step:'add'},
+  {tid:0,label:'Thread 1: STORE r1 → counter',step:'store'},
+  {tid:1,label:'Thread 2: STORE r2 → counter',step:'store'},
+];
+const INSTRS_SAFE = [
+  {tid:0,label:'Thread 1: LOAD counter → r1',step:'load'},
+  {tid:0,label:'Thread 1: ADD  r1, 1',step:'add'},
+  {tid:0,label:'Thread 1: STORE r1 → counter',step:'store'},
+  {tid:1,label:'Thread 2: LOAD counter → r1',step:'load'},
+  {tid:1,label:'Thread 2: ADD  r1, 1',step:'add'},
+  {tid:1,label:'Thread 2: STORE r1 → counter',step:'store'},
+];
+
+let ilInstrs = JSON.parse(JSON.stringify(INSTRS_RACE));
+let dragSrc = null;
+
+function renderInstrs() {
+  const list = document.getElementById('instrList');
+  list.innerHTML = '';
+  ilInstrs.forEach((instr, idx) => {
+    const row = document.createElement('div');
+    row.className = 'il-row';
+    row.draggable = true;
+    row.dataset.idx = idx;
+    row.innerHTML = `
+      <span class="il-drag-handle">⠿</span>
+      <span class="thread-tag ${instr.tid===0?'tt1':'tt2'}">${instr.tid===0?'Thread 1':'Thread 2'}</span>
+      <span class="il-instr">${instr.label}</span>
+    `;
+    row.addEventListener('dragstart', e => { dragSrc = idx; row.classList.add('dragging'); });
+    row.addEventListener('dragend', () => row.classList.remove('dragging'));
+    row.addEventListener('dragover', e => { e.preventDefault(); row.classList.add('drop-target'); });
+    row.addEventListener('dragleave', () => row.classList.remove('drop-target'));
+    row.addEventListener('drop', e => {
+      e.preventDefault(); row.classList.remove('drop-target');
+      if (dragSrc !== null && dragSrc !== idx) {
+        const copy = [...ilInstrs];
+        const [item] = copy.splice(dragSrc, 1);
+        copy.splice(idx, 0, item);
+        ilInstrs = copy; dragSrc = null;
+        renderInstrs();
+        document.getElementById('evalResult').textContent = 'Reordered. Click Evaluate to compute result.';
+        document.getElementById('evalResult').style.color = '#888';
+      }
+    });
+    list.appendChild(row);
+  });
+}
+
+function showRaceInterleave() { ilInstrs = JSON.parse(JSON.stringify(INSTRS_RACE)); renderInstrs(); document.getElementById('evalResult').textContent = 'Classic lost-update race shown. Click Evaluate.'; document.getElementById('evalResult').style.color = '#ff8c00'; }
+function showSafeInterleave() { ilInstrs = JSON.parse(JSON.stringify(INSTRS_SAFE)); renderInstrs(); document.getElementById('evalResult').textContent = 'Safe (non-interleaved) order shown. Click Evaluate.'; document.getElementById('evalResult').style.color = '#7dc87d'; }
+
+function evaluateInterleave() {
+  // Simulate: two threads each do LOAD/ADD/STORE on a shared counter=5
+  let counter = 5;
+  let r1 = 0, r2 = 0;
+  for (const instr of ilInstrs) {
+    if (instr.tid === 0) {
+      if (instr.step === 'load') r1 = counter;
+      else if (instr.step === 'add') r1 = r1 + 1;
+      else if (instr.step === 'store') counter = r1;
+    } else {
+      if (instr.step === 'load') r2 = counter;
+      else if (instr.step === 'add') r2 = r2 + 1;
+      else if (instr.step === 'store') counter = r2;
+    }
+  }
+  const expected = 7;
+  const ok = counter === expected;
+  const el = document.getElementById('evalResult');
+  el.textContent = ok
+    ? `✓ Final counter = ${counter} (correct! No race in this ordering)`
+    : `✗ Final counter = ${counter} — Expected ${expected}. Race condition! ${expected - counter} update(s) lost.`;
+  el.className = 'eval-result ' + (ok ? 'eval-good' : 'eval-bad');
+
+  // Highlight critical windows: a T2 LOAD between T1's LOAD and T1's STORE is a race
+  const rows = document.querySelectorAll('.il-row');
+  let t1LoadIdx = -1;
+  ilInstrs.forEach((ins, i) => {
+    if (ins.tid===0 && ins.step==='load') t1LoadIdx = i;
+    if (ins.tid===1 && ins.step==='load' && t1LoadIdx >= 0) {
+      // Find T1's store after this
+      const t1StoreIdx = ilInstrs.findIndex((x,j) => j>i && x.tid===0 && x.step==='store');
+      if (t1StoreIdx > i) {
+        rows[t1LoadIdx].classList.add('critical-window');
+        rows[i].classList.add('critical-window');
+        rows[t1StoreIdx-1] && rows[t1StoreIdx-1].classList.add('critical-window');
+      }
+    }
+  });
+}
+
+// ─── Utilities ─────────────────────────────────────────────────────────────────
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Init
+renderInstrs();
+</script>
+</body>
+</html>

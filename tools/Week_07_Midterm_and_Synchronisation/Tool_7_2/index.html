@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CS4023 Tool 7.2 — Semaphore Trace</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0f0f1a;color:#e0e0e0;font-family:'Segoe UI',sans-serif;min-height:100vh;padding:16px}
+h1{text-align:center;font-size:1.3rem;color:#ff8c00;margin-bottom:4px}
+.subtitle{text-align:center;font-size:.8rem;color:#888;margin-bottom:14px}
+
+/* Layout */
+.top-area{display:grid;grid-template-columns:220px 1fr 280px;gap:12px;margin-bottom:12px}
+
+/* Config panel */
+.config-panel{background:#1a1a2e;border:1px solid #333;border-radius:10px;padding:12px}
+.cfg-title{font-size:.82rem;font-weight:700;color:#ff8c00;margin-bottom:10px}
+.cfg-row{margin-bottom:10px}
+.cfg-row label{display:block;font-size:.75rem;color:#aaa;margin-bottom:4px}
+.cfg-row input[type=number]{width:64px;background:#0f0f1a;border:1px solid #444;color:#e0e0e0;padding:3px 7px;border-radius:4px;font-size:.85rem}
+.radio-group{display:flex;gap:8px;flex-wrap:wrap}
+.radio-group label{font-size:.75rem;color:#ccc;cursor:pointer}
+.scenario-btns{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+.scen-btn{padding:5px 8px;background:#1f1f2e;border:1px solid #444;color:#ccc;border-radius:5px;cursor:pointer;font-size:.72rem;text-align:left;line-height:1.3}
+.scen-btn:hover{border-color:#ff8c00;color:#ff8c00}
+.ctrl-btn{padding:5px 14px;border:none;border-radius:6px;cursor:pointer;font-size:.8rem;font-weight:600;margin-top:4px}
+.btn-orange{background:#ff8c00;color:#000}
+.btn-orange:hover{background:#e07000}
+.btn-grey{background:#2a2a3a;color:#ccc;border:1px solid #444}
+.btn-grey:hover{background:#333}
+.btn-blue{background:#0070cc;color:#fff}
+.btn-blue:hover{background:#005baa}
+
+/* Semaphore display */
+.sem-display{background:#12122a;border:3px solid #ff8c00;border-radius:12px;padding:14px;text-align:center}
+.sem-label{font-size:.72rem;color:#ff8c00;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.sem-value{font-size:3rem;font-weight:900;line-height:1;transition:all .3s}
+.sem-gauge{height:10px;border-radius:4px;margin:8px auto;max-width:140px;transition:all .3s}
+.sem-desc{font-size:.72rem;color:#888;margin-top:4px;min-height:16px}
+.sem-type-label{font-size:.7rem;color:#555;margin-top:6px}
+
+/* Thread area */
+.thread-area{display:flex;flex-direction:column;gap:7px}
+.thread-row{display:flex;align-items:center;gap:8px;background:#1a1a2e;border:2px solid #333;border-radius:8px;padding:8px 12px;transition:all .3s}
+.thread-row.blocked{border-color:#e05050;background:#2a0a0a}
+.thread-row.unblocking{border-color:#7dc87d;background:#0a2a0a;animation:flash-green .8s ease}
+@keyframes flash-green{0%,100%{background:#0a2a0a}50%{background:#1a4a1a}}
+.th-label{font-size:.8rem;font-weight:700;min-width:64px}
+.th-status{font-size:.72rem;padding:2px 8px;border-radius:4px;min-width:72px;text-align:center;font-weight:600}
+.st-running{background:#1a3a1a;color:#7dc87d;border:1px solid #3a6a3a}
+.st-blocked{background:#3a0a0a;color:#e05050;border:1px solid #6a1a1a}
+.st-waiting{background:#3a2a00;color:#ff8c00;border:1px solid #6a4000}
+.th-reg{font-size:.72rem;color:#888;font-family:monospace;flex:1;text-align:center;min-height:16px}
+.th-btns{display:flex;gap:5px}
+.th-btn{padding:4px 10px;border:none;border-radius:5px;cursor:pointer;font-size:.78rem;font-weight:600;transition:all .15s}
+.btn-P{background:#0070cc;color:#fff}
+.btn-P:hover:not(:disabled){background:#005baa}
+.btn-V{background:#3a6a3a;color:#7dc87d;border:1px solid #3a6a3a}
+.btn-V:hover:not(:disabled){background:#2a5a2a}
+.th-btn:disabled{opacity:.35;cursor:default}
+.wait-queue{font-size:.68rem;color:#888;text-align:center;margin-top:2px;min-height:14px}
+
+/* Trace log */
+.trace-panel{background:#1a1a2e;border:1px solid #333;border-radius:10px;padding:10px;display:flex;flex-direction:column}
+.trace-title{font-size:.82rem;font-weight:700;color:#ff8c00;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.trace-log{flex:1;max-height:220px;overflow-y:auto;font-family:monospace;font-size:.7rem;line-height:1.5}
+.tlog-entry{padding:1px 0;border-bottom:1px solid #1f1f2e}
+.tlog-time{color:#555}
+.tlog-ok{color:#7dc87d}
+.tlog-block{color:#e05050}
+.tlog-wake{color:#5b9bd5}
+.tlog-V{color:#cc88ff}
+
+/* Challenge mode */
+.challenge-area{margin-top:12px;background:#1a1a2e;border:1px solid #444;border-radius:10px;padding:12px}
+.ch-title{font-size:.85rem;font-weight:700;color:#ff8c00;margin-bottom:8px}
+.ch-sequence{font-family:monospace;font-size:.78rem;color:#ccc;background:#0f0f1a;border:1px solid #333;border-radius:6px;padding:8px;margin-bottom:10px;line-height:1.7}
+.ch-inputs{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px}
+.ch-inputs label{font-size:.75rem;color:#aaa}
+.ch-inputs input{background:#0f0f1a;border:1px solid #444;color:#e0e0e0;padding:3px 7px;border-radius:4px;font-size:.8rem;width:70px}
+.ch-result{font-size:.8rem;padding:5px 10px;border-radius:5px;display:inline-block}
+.ch-ok{background:#1a3a1a;color:#7dc87d;border:1px solid #3a6a3a}
+.ch-bad{background:#3a0a0a;color:#e05050;border:1px solid #6a1a1a}
+</style>
+</head>
+<body>
+
+<h1>CS4023 Tool 7.2 — Semaphore Trace</h1>
+<div class="subtitle">Interactive Semaphore P/V Operations · CS4023 Operating Systems</div>
+
+<div class="top-area">
+
+  <!-- Config -->
+  <div class="config-panel">
+    <div class="cfg-title">Configuration</div>
+
+    <div class="cfg-row">
+      <label>Initial Value (S₀)</label>
+      <input type="number" id="initVal" value="1" min="0" max="5" onchange="applyConfig()">
+    </div>
+
+    <div class="cfg-row">
+      <label>Number of Threads</label>
+      <div class="radio-group">
+        <label><input type="radio" name="numThreads" value="2" checked onchange="applyConfig()"> 2</label>
+        <label><input type="radio" name="numThreads" value="3" onchange="applyConfig()"> 3</label>
+        <label><input type="radio" name="numThreads" value="4" onchange="applyConfig()"> 4</label>
+      </div>
+    </div>
+
+    <div class="cfg-row">
+      <label>Type</label>
+      <div class="radio-group">
+        <label><input type="radio" name="semType" value="binary" checked onchange="applyConfig()"> Binary</label>
+        <label><input type="radio" name="semType" value="counting" onchange="applyConfig()"> Counting</label>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="ctrl-btn btn-orange" onclick="applyConfig()">Apply</button>
+      <button class="ctrl-btn btn-grey" onclick="resetConfig()">Reset</button>
+    </div>
+
+    <div style="margin-top:10px;font-size:.74rem;color:#aaa;font-weight:600">Scenarios:</div>
+    <div class="scenario-btns">
+      <button class="scen-btn" onclick="loadScenario('mutex')">🔒 Mutex (S=1, 2T)</button>
+      <button class="scen-btn" onclick="loadScenario('pool')">📦 Resource Pool (S=3, 5T)</button>
+      <button class="scen-btn" onclick="loadScenario('prodcons')">🔄 Producer-Consumer (S=0)</button>
+      <button class="scen-btn" onclick="loadScenario('deadlock')">💀 Deadlock (S=1, 2P)</button>
+    </div>
+  </div>
+
+  <!-- Middle: semaphore + threads -->
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div class="sem-display">
+      <div class="sem-label">Semaphore S</div>
+      <div class="sem-value" id="semValue">1</div>
+      <div class="sem-gauge" id="semGauge" style="width:100%;background:#ff8c00"></div>
+      <div class="sem-desc" id="semDesc">S = 1 — available</div>
+      <div class="sem-type-label" id="semTypeLabel">Binary semaphore</div>
+    </div>
+    <div class="thread-area" id="threadArea"></div>
+  </div>
+
+  <!-- Trace log -->
+  <div class="trace-panel">
+    <div class="trace-title">
+      <span>Trace Log</span>
+      <button class="ctrl-btn btn-grey" style="padding:2px 8px;font-size:.7rem" onclick="clearLog()">Clear</button>
+    </div>
+    <div class="trace-log" id="traceLog"></div>
+  </div>
+
+</div>
+
+<!-- Challenge Mode -->
+<div class="challenge-area">
+  <div class="ch-title">🎯 Challenge Mode</div>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+    <button class="ctrl-btn btn-blue" onclick="generateChallenge()">Generate Challenge</button>
+    <button class="ctrl-btn btn-orange" id="chPlayBtn" onclick="playChallengeTrace()" style="display:none">▶ Play Trace</button>
+    <span style="font-size:.75rem;color:#888" id="chHelp">Press Generate to get a random sequence of P/V operations. Predict the outcome!</span>
+  </div>
+  <div class="ch-sequence" id="chSequence" style="display:none"></div>
+  <div class="ch-inputs" id="chInputs" style="display:none">
+    <div>
+      <label>Final S value:</label><br>
+      <input type="number" id="chFinalS" placeholder="S = ?">
+    </div>
+    <div>
+      <label>Blocked threads (e.g. 1,3):</label><br>
+      <input type="text" id="chBlocked" placeholder="none">
+    </div>
+    <button class="ctrl-btn btn-orange" onclick="checkChallenge()">Check Answers</button>
+  </div>
+  <div id="chResult"></div>
+</div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+let S = 1;        // semaphore value
+let S0 = 1;       // initial value
+let maxS = 1;     // for gauge
+let numThreads = 2;
+let semType = 'binary';
+let blocked = [];  // thread indices that are blocked
+let waitQueue = [];  // FIFO queue of blocked thread indices
+let opCount = 0;
+let scenDesc = '';
+
+// Challenge state
+let challengeOps = [];
+let challengeAnswer = {finalS: 0, blocked: []};
+
+// ─── Config ───────────────────────────────────────────────────────────────────
+function getConfig() {
+  S0 = Math.max(0, Math.min(5, parseInt(document.getElementById('initVal').value)||1));
+  numThreads = parseInt(document.querySelector('input[name=numThreads]:checked').value);
+  semType = document.querySelector('input[name=semType]:checked').value;
+}
+
+function applyConfig() {
+  getConfig();
+  maxS = S0 > 0 ? S0 : 1;
+  S = S0;
+  blocked = new Array(numThreads).fill(false);
+  waitQueue = [];
+  opCount = 0;
+  renderThreads();
+  updateSemDisplay();
+  clearLog();
+}
+
+function resetConfig() {
+  document.getElementById('initVal').value = 1;
+  document.querySelector('input[name=numThreads][value="2"]').checked = true;
+  document.querySelector('input[name=semType][value="binary"]').checked = true;
+  applyConfig();
+}
+
+function loadScenario(name) {
+  const scenarios = {
+    mutex: {init:1,threads:2,type:'binary',desc:'Mutual exclusion: only one thread at a time'},
+    pool: {init:3,threads:5,type:'counting',desc:'Resource pool: 3 slots, 5 threads compete'},
+    prodcons: {init:0,threads:2,type:'binary',desc:'Producer-Consumer: consumer waits for producer to signal'},
+    deadlock: {init:1,threads:2,type:'binary',desc:'Deadlock: both threads do P, P — neither can V!'},
+  };
+  const s = scenarios[name];
+  document.getElementById('initVal').value = s.init;
+  document.querySelector(`input[name=numThreads][value="${Math.min(s.threads,4)}"]`).checked = true;
+  document.querySelector(`input[name=semType][value="${s.type}"]`).checked = true;
+  scenDesc = s.desc;
+  applyConfig();
+  addLog('system', `Scenario loaded: ${scenDesc}`);
+}
+
+// ─── Thread rendering ──────────────────────────────────────────────────────────
+function renderThreads() {
+  const area = document.getElementById('threadArea');
+  area.innerHTML = '';
+  for (let i=0;i<numThreads;i++) {
+    const isBlocked = blocked[i];
+    const row = document.createElement('div');
+    row.className = 'thread-row' + (isBlocked ? ' blocked' : '');
+    row.id = 'trow'+i;
+    row.innerHTML = `
+      <span class="th-label">Thread ${i+1}</span>
+      <span class="th-status ${isBlocked?'st-blocked':'st-running'}" id="tstatus${i}">${isBlocked?'BLOCKED':'RUNNING'}</span>
+      <span class="th-reg" id="treg${i}"></span>
+      <div class="th-btns">
+        <button class="th-btn btn-P" id="tP${i}" onclick="doPSem(${i})" ${isBlocked?'disabled':''}>P(S)</button>
+        <button class="th-btn btn-V" id="tV${i}" onclick="doVSem(${i})">V(S)</button>
+      </div>
+    `;
+    area.appendChild(row);
+  }
+}
+
+function updateThreadUI(i) {
+  const row = document.getElementById('trow'+i);
+  if (!row) return;
+  const isBlocked = blocked[i];
+  row.className = 'thread-row' + (isBlocked ? ' blocked' : '');
+  document.getElementById('tstatus'+i).textContent = isBlocked ? 'BLOCKED' : 'RUNNING';
+  document.getElementById('tstatus'+i).className = 'th-status ' + (isBlocked ? 'st-blocked' : 'st-running');
+  document.getElementById('tP'+i).disabled = isBlocked;
+}
+
+// ─── Semaphore display ─────────────────────────────────────────────────────────
+function updateSemDisplay() {
+  const el = document.getElementById('semValue');
+  el.textContent = S;
+  const gauge = document.getElementById('semGauge');
+  const desc = document.getElementById('semDesc');
+  const typeLabel = document.getElementById('semTypeLabel');
+  const pct = maxS > 0 ? Math.max(0, Math.min(100, (S/maxS)*100)) : 0;
+  if (S > 0) { el.style.color='#7dc87d'; gauge.style.background='#ff8c00'; gauge.style.width=pct+'%'; desc.textContent=`S = ${S} — available`; }
+  else if (S === 0) { el.style.color='#ff8c00'; gauge.style.background='#ff8c00'; gauge.style.width='4px'; desc.textContent='S = 0 — next P() will block'; }
+  else { el.style.color='#e05050'; gauge.style.background='#e05050'; gauge.style.width='4px'; desc.textContent=`S = ${S} — ${Math.abs(S)} thread(s) blocked`; }
+  typeLabel.textContent = semType==='binary' ? 'Binary semaphore (max=1)' : `Counting semaphore (initial=${S0})`;
+}
+
+// ─── P / V operations ─────────────────────────────────────────────────────────
+function doPSem(i) {
+  opCount++;
+  S--;
+  updateSemDisplay();
+  if (S < 0) {
+    blocked[i] = true;
+    waitQueue.push(i);
+    updateThreadUI(i);
+    addLog('block', `Thread ${i+1}: P(S) → S=${S} [BLOCKED]`);
+  } else {
+    addLog('ok', `Thread ${i+1}: P(S) → S=${S}`);
+  }
+}
+
+function doVSem(i) {
+  opCount++;
+  S++;
+  updateSemDisplay();
+  let wokeMsg = '';
+  if (waitQueue.length > 0 && S <= 0) {
+    const woke = waitQueue.shift();
+    blocked[woke] = false;
+    updateThreadUI(woke);
+    // Flash green
+    const row = document.getElementById('trow'+woke);
+    if (row) { row.classList.add('unblocking'); setTimeout(()=>row.classList.remove('unblocking'), 900); }
+    wokeMsg = ` [unblocked Thread ${woke+1}]`;
+  }
+  addLog('V', `Thread ${i+1}: V(S) → S=${S}${wokeMsg}`);
+}
+
+// ─── Trace log ────────────────────────────────────────────────────────────────
+let logCount = 0;
+function addLog(type, msg) {
+  const log = document.getElementById('traceLog');
+  const el = document.createElement('div');
+  el.className = 'tlog-entry';
+  const cls = type==='block'?'tlog-block':type==='ok'?'tlog-ok':type==='wake'?'tlog-wake':type==='V'?'tlog-V':'';
+  el.innerHTML = `<span class="tlog-time">[${String(++logCount).padStart(3,'0')}]</span> <span class="${cls}">${msg}</span>`;
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+}
+function clearLog() { document.getElementById('traceLog').innerHTML = ''; logCount = 0; }
+
+// ─── Challenge Mode ───────────────────────────────────────────────────────────
+function generateChallenge() {
+  // Use current config
+  getConfig();
+  const initS = parseInt(document.getElementById('initVal').value)||1;
+  const nt = parseInt(document.querySelector('input[name=numThreads]:checked').value);
+  
+  // Generate 8 random P/V ops
+  const ops = [];
+  for (let k=0;k<8;k++) {
+    ops.push({tid: Math.floor(Math.random()*nt), op: Math.random()<0.55?'P':'V'});
+  }
+  challengeOps = ops;
+
+  // Simulate to compute answer
+  let s = initS;
+  const blk = new Array(nt).fill(false);
+  const wq = [];
+  for (const op of ops) {
+    if (op.op === 'P') {
+      s--;
+      if (s < 0) { blk[op.tid] = true; wq.push(op.tid); }
+    } else {
+      s++;
+      if (wq.length > 0 && s <= 0) { const w = wq.shift(); blk[w] = false; }
+    }
+  }
+  challengeAnswer = {finalS: s, blocked: blk.map((b,i)=>b?i+1:-1).filter(x=>x>0)};
+
+  // Render
+  const seq = ops.map((op,k)=>`  ${k+1}. Thread ${op.tid+1}: ${op.op}(S)`).join('\n');
+  const seqEl = document.getElementById('chSequence');
+  seqEl.style.display = 'block';
+  seqEl.innerHTML = `<b>Initial S = ${initS}, ${nt} threads</b>\n${seq}`;
+  document.getElementById('chInputs').style.display = 'flex';
+  document.getElementById('chPlayBtn').style.display = 'inline-block';
+  document.getElementById('chResult').innerHTML = '';
+  document.getElementById('chFinalS').value = '';
+  document.getElementById('chBlocked').value = '';
+  document.getElementById('chHelp').textContent = `Predict the final S value and which threads (if any) are blocked after all 8 operations.`;
+}
+
+function checkChallenge() {
+  const guessS = parseInt(document.getElementById('chFinalS').value);
+  const guessBlocked = document.getElementById('chBlocked').value.trim();
+  const guessBlockedArr = guessBlocked === '' || guessBlocked.toLowerCase() === 'none'
+    ? [] : guessBlocked.split(/[,\s]+/).map(x=>parseInt(x)).filter(n=>!isNaN(n));
+  
+  const correctS = challengeAnswer.finalS;
+  const correctBlocked = challengeAnswer.blocked;
+  
+  const sOk = guessS === correctS;
+  const bOk = JSON.stringify(guessBlockedArr.sort()) === JSON.stringify(correctBlocked.sort());
+  const allOk = sOk && bOk;
+  
+  const blockedStr = correctBlocked.length ? correctBlocked.map(x=>'Thread '+x).join(', ') : 'none';
+  document.getElementById('chResult').innerHTML = `
+    <div class="ch-result ${allOk?'ch-ok':'ch-bad'}">
+      ${allOk ? '✓ Correct!' : '✗ Not quite.'}
+      Final S = <b>${correctS}</b>. Blocked: <b>${blockedStr}</b>.
+      ${!sOk ? `(Your S: ${guessS})` : ''} ${!bOk ? `(Your blocked: ${guessBlockedArr.length?guessBlockedArr.map(x=>'Thread '+x).join(', '):'none'})` : ''}
+    </div>`;
+}
+
+async function playChallengeTrace() {
+  if (!challengeOps.length) return;
+  getConfig();
+  applyConfig();
+  clearLog();
+  addLog('system', '▶ Playing challenge trace…');
+  for (const op of challengeOps) {
+    await new Promise(r=>setTimeout(r, 800));
+    if (op.op === 'P') doPSem(op.tid);
+    else doVSem(op.tid);
+  }
+  addLog('system', '✓ Trace complete');
+}
+
+// Init
+applyConfig();
+</script>
+</body>
+</html>
