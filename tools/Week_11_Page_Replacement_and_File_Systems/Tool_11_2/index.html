@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CS4023 – Tool 11.2 Inode Explorer</title>
+<style>
+  :root {
+    --navy: #1a1a2e;
+    --navy2: #16213e;
+    --orange: #e94560;
+    --accent: #f5a623;
+    --green: #27ae60;
+    --red: #e74c3c;
+    --text: #e0e0e0;
+    --muted: #888;
+    --border: #2d2d4e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--navy); color: var(--text); font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+  header { background: var(--navy2); border-bottom: 2px solid var(--orange); padding: 12px 24px; display: flex; align-items: center; gap: 16px; }
+  header h1 { font-size: 1.1rem; color: var(--accent); }
+  header span { font-size: 0.85rem; color: var(--muted); }
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--navy2); padding: 0 24px; }
+  .tab { padding: 10px 20px; cursor: pointer; font-size: 0.9rem; color: var(--muted); border-bottom: 3px solid transparent; transition: all 0.2s; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab:hover { color: var(--text); }
+  .panel { display: none; padding: 24px; }
+  .panel.active { display: block; }
+
+  button { background: var(--orange); color: #fff; border: none; padding: 7px 16px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: opacity 0.2s; }
+  button:hover { opacity: 0.85; }
+  .btn-secondary { background: var(--navy2); border: 1px solid var(--border); color: var(--text); }
+  select, input[type=number], input[type=text] {
+    background: var(--navy2); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 10px; border-radius: 4px; font-size: 0.9rem;
+  }
+  .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
+  .controls label { font-size: 0.85rem; color: var(--muted); }
+  .info-box { background: var(--navy2); border-left: 3px solid var(--accent); padding: 10px 14px; border-radius: 0 6px 6px 0; font-size: 0.85rem; line-height: 1.5; margin-bottom: 16px; }
+
+  /* Panel 1: Inode Structure */
+  .inode-layout { display: grid; grid-template-columns: 200px 1fr; gap: 24px; align-items: start; }
+  .inode-box { background: var(--navy2); border: 2px solid var(--accent); border-radius: 8px; overflow: hidden; }
+  .inode-box h3 { background: var(--accent); color: var(--navy); padding: 8px 12px; font-size: 0.9rem; font-weight: 700; text-align: center; }
+  .inode-slot { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: 0.8rem; cursor: pointer; transition: background 0.2s; }
+  .inode-slot:hover { background: rgba(245,166,35,0.1); }
+  .inode-slot.active { background: rgba(245,166,35,0.2); border-left: 3px solid var(--accent); }
+  .inode-slot .slot-name { color: var(--muted); font-size: 0.75rem; }
+  .inode-slot .slot-val  { color: var(--text); font-weight: 600; font-size: 0.8rem; }
+  .inode-slot .level-badge { font-size: 0.7rem; padding: 1px 5px; border-radius: 3px; margin-left: 4px; }
+  .badge-direct { background: #1a4a3a; color: #55efc4; }
+  .badge-si     { background: #1a2a4a; color: #74b9ff; }
+  .badge-di     { background: #2a1a4a; color: #a29bfe; }
+  .badge-ti     { background: #3a1a1a; color: #ff7675; }
+  .inode-detail { background: var(--navy2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; min-height: 200px; }
+  .inode-detail h4 { color: var(--accent); margin-bottom: 10px; }
+  .block-chain { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .block-badge { display: inline-flex; align-items: center; background: var(--border); border-radius: 4px; padding: 4px 10px; font-size: 0.8rem; font-family: monospace; gap: 4px; }
+  .block-badge.data { border-left: 3px solid var(--green); }
+  .block-badge.index { border-left: 3px solid #74b9ff; }
+  .block-badge.index2 { border-left: 3px solid #a29bfe; }
+  .arrow { color: var(--muted); font-size: 1.1rem; }
+
+  /* Panel 2: Max File Size Calculator */
+  .calc-grid { display: grid; grid-template-columns: 280px 1fr; gap: 24px; }
+  .calc-controls { background: var(--navy2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .calc-controls h3 { color: var(--accent); margin-bottom: 12px; font-size: 0.95rem; }
+  .calc-controls .field { margin-bottom: 12px; }
+  .calc-controls .field label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; }
+  .calc-table { background: var(--navy2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .calc-table table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  .calc-table th { background: var(--border); padding: 10px 14px; text-align: left; font-size: 0.85rem; }
+  .calc-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .calc-table tr.total-row td { font-weight: 700; color: var(--accent); background: rgba(245,166,35,0.05); }
+  .calc-table .num { font-family: monospace; text-align: right; }
+
+  /* Panel 3: Block Traversal */
+  .trav-grid { display: grid; grid-template-columns: 300px 1fr; gap: 24px; }
+  .trav-controls { background: var(--navy2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .trav-controls h3 { color: var(--accent); margin-bottom: 12px; }
+  .trav-controls .field { margin-bottom: 12px; }
+  .trav-controls .field label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; }
+  .trav-result { background: var(--navy2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .trav-result h3 { color: var(--accent); margin-bottom: 12px; }
+  .step-list { list-style: none; padding: 0; }
+  .step-list li { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
+  .step-num { background: var(--accent); color: var(--navy); border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; flex-shrink: 0; }
+  .step-text code { background: var(--border); padding: 1px 5px; border-radius: 3px; font-size: 0.82rem; }
+  .result-summary { margin-top: 14px; padding: 12px 14px; border-radius: 6px; font-size: 0.9rem; }
+  .result-summary.direct  { background: rgba(39,174,96,0.15); border: 1px solid var(--green); }
+  .result-summary.si      { background: rgba(116,185,255,0.15); border: 1px solid #74b9ff; }
+  .result-summary.di      { background: rgba(162,155,254,0.15); border: 1px solid #a29bfe; }
+  .result-summary.ti      { background: rgba(255,118,117,0.15); border: 1px solid #ff7675; }
+  .result-summary.out     { background: rgba(231,76,60,0.15); border: 1px solid var(--red); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>CS4023 – Tool 11.2: Inode Explorer</h1>
+  <span>L11.2 – File Systems: Concepts and Implementation</span>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('structure')">Inode Structure</div>
+  <div class="tab" onclick="switchTab('calculator')">Max File Size</div>
+  <div class="tab" onclick="switchTab('traversal')">Block Traversal</div>
+</div>
+
+<!-- PANEL 1: Inode Structure -->
+<div id="tab-structure" class="panel active">
+  <div class="info-box">
+    Click any pointer slot in the inode to explore what it points to. Direct pointers point to data blocks directly; indirect pointers route through index blocks.
+  </div>
+  <div class="inode-layout">
+    <div>
+      <div class="inode-box">
+        <h3>Inode</h3>
+        <div id="inode-slots"></div>
+      </div>
+    </div>
+    <div class="inode-detail" id="inode-detail">
+      <h4>Inode Pointer Explorer</h4>
+      <p style="color:var(--muted);font-size:0.85rem">Click a pointer slot on the left to see how it addresses data blocks.</p>
+    </div>
+  </div>
+</div>
+
+<!-- PANEL 2: Calculator -->
+<div id="tab-calculator" class="panel">
+  <div class="info-box">
+    Adjust block size and pointer size to see how the maximum file size changes. The inode has 12 direct, 1 single indirect, 1 double indirect, and 1 triple indirect pointer.
+  </div>
+  <div class="calc-grid">
+    <div class="calc-controls">
+      <h3>Parameters</h3>
+      <div class="field">
+        <label>Block size</label>
+        <select id="calc-block-size" onchange="calcUpdate()">
+          <option value="512">512 B</option>
+          <option value="1024">1 KB</option>
+          <option value="4096" selected>4 KB</option>
+          <option value="8192">8 KB</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Pointer size</label>
+        <select id="calc-ptr-size" onchange="calcUpdate()">
+          <option value="4" selected>4 bytes (32-bit)</option>
+          <option value="8">8 bytes (64-bit)</option>
+        </select>
+      </div>
+      <div class="field" style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+        <p style="font-size:0.8rem;color:var(--muted)">Pointers per block:</p>
+        <p id="calc-ptrs-per-block" style="font-size:1.2rem;color:var(--accent);font-weight:700;margin-top:4px">1024</p>
+      </div>
+    </div>
+    <div class="calc-table">
+      <table>
+        <thead><tr><th>Level</th><th>Pointers</th><th class="num">Blocks</th><th class="num">Size</th></tr></thead>
+        <tbody id="calc-tbody"></tbody>
+        <tfoot id="calc-tfoot"></tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- PANEL 3: Traversal -->
+<div id="tab-traversal" class="panel">
+  <div class="info-box">
+    Enter a byte offset in a file to see exactly how the OS traverses the inode structure to find the right disk block, and how many disk I/O operations are required.
+  </div>
+  <div class="trav-grid">
+    <div class="trav-controls">
+      <h3>Parameters</h3>
+      <div class="field">
+        <label>Block size</label>
+        <select id="trav-block-size">
+          <option value="512">512 B</option>
+          <option value="1024">1 KB</option>
+          <option value="4096" selected>4 KB</option>
+          <option value="8192">8 KB</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Pointer size</label>
+        <select id="trav-ptr-size">
+          <option value="4" selected>4 bytes (32-bit)</option>
+          <option value="8">8 bytes (64-bit)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Byte offset in file</label>
+        <input type="number" id="trav-offset" value="5000000" min="0" style="width:160px">
+      </div>
+      <button onclick="travRun()" style="width:100%;margin-top:8px">Find Block →</button>
+    </div>
+    <div class="trav-result" id="trav-result">
+      <h3>Traversal Result</h3>
+      <p style="color:var(--muted);font-size:0.85rem">Enter a byte offset and click Find Block.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// TAB SWITCHING
+// ============================================================
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', ['structure','calculator','traversal'][i] === name);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ============================================================
+// PANEL 1: INODE STRUCTURE
+// ============================================================
+function buildInodeSlots() {
+  const container = document.getElementById('inode-slots');
+  container.innerHTML = '';
+  // 12 direct
+  for (let i = 0; i < 12; i++) {
+    const el = document.createElement('div');
+    el.className = 'inode-slot';
+    el.innerHTML = `<span class="slot-name">Direct[${i}]</span><span class="slot-val">blk ${100+i} <span class="level-badge badge-direct">direct</span></span>`;
+    el.onclick = () => showDirect(i, 100+i);
+    container.appendChild(el);
+  }
+  // single indirect
+  const si = document.createElement('div');
+  si.className = 'inode-slot';
+  si.innerHTML = `<span class="slot-name">Single Indirect</span><span class="slot-val">blk 500 <span class="level-badge badge-si">SI</span></span>`;
+  si.onclick = () => showSI(500);
+  container.appendChild(si);
+  // double indirect
+  const di = document.createElement('div');
+  di.className = 'inode-slot';
+  di.innerHTML = `<span class="slot-name">Double Indirect</span><span class="slot-val">blk 600 <span class="level-badge badge-di">DI</span></span>`;
+  di.onclick = () => showDI(600);
+  container.appendChild(di);
+  // triple indirect
+  const ti = document.createElement('div');
+  ti.className = 'inode-slot';
+  ti.innerHTML = `<span class="slot-name">Triple Indirect</span><span class="slot-val">blk 700 <span class="level-badge badge-ti">TI</span></span>`;
+  ti.onclick = () => showTI(700);
+  container.appendChild(ti);
+}
+
+function clearActive() {
+  document.querySelectorAll('.inode-slot').forEach(s => s.classList.remove('active'));
+}
+
+function showDirect(idx, blk) {
+  clearActive();
+  document.querySelectorAll('.inode-slot')[idx].classList.add('active');
+  const d = document.getElementById('inode-detail');
+  d.innerHTML = `
+    <h4>Direct[${idx}] → Block ${blk}</h4>
+    <p style="font-size:0.85rem;color:var(--muted);margin-bottom:12px">
+      Direct pointers address data blocks immediately — 1 disk read to get the data (plus inode read = 2 total).
+    </p>
+    <div class="block-chain">
+      <div class="block-badge index">Inode (Direct[${idx}])</div>
+      <span class="arrow">→</span>
+      <div class="block-badge data">Block ${blk} (data)</div>
+    </div>
+    <div style="margin-top:16px;padding:10px 12px;background:rgba(39,174,96,0.1);border-left:3px solid var(--green);border-radius:0 6px 6px 0;font-size:0.85rem">
+      Disk accesses to read this block: <strong>2</strong> (1 inode + 1 data read)
+    </div>`;
+}
+
+function showSI(siBlk) {
+  clearActive();
+  document.querySelectorAll('.inode-slot')[12].classList.add('active');
+  const d = document.getElementById('inode-detail');
+  const ptrsPerBlock = 1024; // default 4KB/4B
+  d.innerHTML = `
+    <h4>Single Indirect → Block ${siBlk}</h4>
+    <p style="font-size:0.85rem;color:var(--muted);margin-bottom:12px">
+      The inode's SI pointer → index block (${siBlk}) → up to ${ptrsPerBlock} data block pointers.
+      With 4 KB blocks, 4-byte pointers: 1024 data blocks = 4 MB of file data reachable.
+    </p>
+    <div class="block-chain">
+      <div class="block-badge index">Inode (SI ptr)</div>
+      <span class="arrow">→</span>
+      <div class="block-badge index">Block ${siBlk}<br><small style="color:var(--muted)">index block</small></div>
+      <span class="arrow">→</span>
+      <div class="block-badge data">Block 200 (data[12])</div>
+      <span class="arrow">…</span>
+      <div class="block-badge data">Block 1223 (data[1035])</div>
+    </div>
+    <div style="margin-top:16px;padding:10px 12px;background:rgba(116,185,255,0.1);border-left:3px solid #74b9ff;border-radius:0 6px 6px 0;font-size:0.85rem">
+      Disk accesses to read any SI-range block: <strong>3</strong> (1 inode + 1 index block + 1 data read)
+    </div>`;
+}
+
+function showDI(diBlk) {
+  clearActive();
+  document.querySelectorAll('.inode-slot')[13].classList.add('active');
+  const d = document.getElementById('inode-detail');
+  d.innerHTML = `
+    <h4>Double Indirect → Block ${diBlk}</h4>
+    <p style="font-size:0.85rem;color:var(--muted);margin-bottom:12px">
+      DI pointer → outer index block → 1024 inner index blocks → each → 1024 data blocks.<br>
+      Total: 1024² = 1,048,576 data blocks = <strong>4 GB</strong> (4 KB blocks).
+    </p>
+    <div class="block-chain">
+      <div class="block-badge index">Inode (DI ptr)</div>
+      <span class="arrow">→</span>
+      <div class="block-badge index">Block ${diBlk}<br><small style="color:var(--muted)">outer index</small></div>
+      <span class="arrow">→</span>
+      <div class="block-badge index2">Inner index[0]</div>
+      <span class="arrow">→</span>
+      <div class="block-badge data">Data block</div>
+    </div>
+    <div style="margin-top:16px;padding:10px 12px;background:rgba(162,155,254,0.1);border-left:3px solid #a29bfe;border-radius:0 6px 6px 0;font-size:0.85rem">
+      Disk accesses for DI block: <strong>4</strong> (1 inode + 1 outer index + 1 inner index + 1 data read)
+    </div>`;
+}
+
+function showTI(tiBlk) {
+  clearActive();
+  document.querySelectorAll('.inode-slot')[14].classList.add('active');
+  const d = document.getElementById('inode-detail');
+  d.innerHTML = `
+    <h4>Triple Indirect → Block ${tiBlk}</h4>
+    <p style="font-size:0.85rem;color:var(--muted);margin-bottom:12px">
+      TI pointer → 3 levels of index blocks → 1024³ data blocks = <strong>~4 TB</strong> (4 KB blocks).
+    </p>
+    <div class="block-chain">
+      <div class="block-badge index">Inode (TI ptr)</div>
+      <span class="arrow">→</span>
+      <div class="block-badge index">L1 index</div>
+      <span class="arrow">→</span>
+      <div class="block-badge index2">L2 index</div>
+      <span class="arrow">→</span>
+      <div class="block-badge index2">L3 index</div>
+      <span class="arrow">→</span>
+      <div class="block-badge data">Data block</div>
+    </div>
+    <div style="margin-top:16px;padding:10px 12px;background:rgba(255,118,117,0.1);border-left:3px solid #ff7675;border-radius:0 6px 6px 0;font-size:0.85rem">
+      Disk accesses for TI block: <strong>5</strong> (1 inode + 3 index reads + 1 data read)
+    </div>`;
+}
+
+// ============================================================
+// PANEL 2: CALCULATOR
+// ============================================================
+function formatSize(bytes) {
+  if (bytes === Infinity || bytes > 1e18) return '~∞ (vast)';
+  if (bytes >= 1e15) return (bytes/1e15).toFixed(1) + ' PB';
+  if (bytes >= 1e12) return (bytes/1e12).toFixed(2) + ' TB';
+  if (bytes >= 1e9)  return (bytes/1e9).toFixed(2) + ' GB';
+  if (bytes >= 1e6)  return (bytes/1e6).toFixed(2) + ' MB';
+  if (bytes >= 1e3)  return (bytes/1e3).toFixed(1) + ' KB';
+  return bytes + ' B';
+}
+
+function formatNum(n) {
+  if (n >= 1e12) return n.toExponential(2);
+  return n.toLocaleString();
+}
+
+function calcUpdate() {
+  const bs = parseInt(document.getElementById('calc-block-size').value);
+  const ps = parseInt(document.getElementById('calc-ptr-size').value);
+  const ppb = Math.floor(bs / ps);
+  document.getElementById('calc-ptrs-per-block').textContent = ppb.toLocaleString();
+
+  const levels = [
+    { name: 'Direct (×12)', ptrs: 12, blocks: 12, bytes: 12*bs },
+    { name: 'Single Indirect', ptrs: ppb, blocks: ppb, bytes: ppb*bs },
+    { name: 'Double Indirect', ptrs: ppb*ppb, blocks: ppb*ppb, bytes: ppb*ppb*bs },
+    { name: 'Triple Indirect', ptrs: ppb*ppb*ppb, blocks: ppb*ppb*ppb, bytes: ppb*ppb*ppb*bs },
+  ];
+  const total = levels.reduce((a,l) => a + l.bytes, 0);
+
+  const tbody = document.getElementById('calc-tbody');
+  tbody.innerHTML = levels.map(l => `
+    <tr>
+      <td>${l.name}</td>
+      <td class="num">${formatNum(l.ptrs)}</td>
+      <td class="num">${formatNum(l.blocks)}</td>
+      <td class="num"><strong>${formatSize(l.bytes)}</strong></td>
+    </tr>`).join('');
+  document.getElementById('calc-tfoot').innerHTML = `
+    <tr class="total-row">
+      <td><strong>Total Maximum</strong></td>
+      <td class="num">—</td>
+      <td class="num">—</td>
+      <td class="num">${formatSize(total)}</td>
+    </tr>`;
+}
+
+// ============================================================
+// PANEL 3: TRAVERSAL
+// ============================================================
+function travRun() {
+  const bs = parseInt(document.getElementById('trav-block-size').value);
+  const ps = parseInt(document.getElementById('trav-ptr-size').value);
+  const offset = parseInt(document.getElementById('trav-offset').value);
+  const ppb = Math.floor(bs / ps);
+
+  const blockNum = Math.floor(offset / bs);
+  const offsetInBlock = offset % bs;
+
+  const D = 12;
+  const SI_START = D;
+  const DI_START = SI_START + ppb;
+  const TI_START = DI_START + ppb * ppb;
+  const MAX_BLOCK = TI_START + ppb * ppb * ppb;
+
+  let steps = [];
+  steps.push({ text: `Block number = ⌊${offset} / ${bs}⌋ = <code>${blockNum}</code> (offset within block: ${offsetInBlock} bytes)` });
+
+  let levelClass, levelName, diskAccesses, extra = [];
+
+  if (blockNum < D) {
+    levelClass = 'direct';
+    levelName = 'Direct';
+    diskAccesses = 2;
+    extra.push(`Block ${blockNum} < ${D} → use <code>Direct[${blockNum}]</code>`);
+    extra.push(`Disk accesses: read inode (1) + read data block (1) = <strong>2 total</strong>`);
+  } else if (blockNum < DI_START) {
+    levelClass = 'si';
+    levelName = 'Single Indirect';
+    diskAccesses = 3;
+    const idxInSI = blockNum - SI_START;
+    extra.push(`Block ${blockNum} ≥ ${D} and < ${DI_START} → Single Indirect range`);
+    extra.push(`Index into SI block = ${blockNum} − ${D} = <code>${idxInSI}</code>`);
+    extra.push(`Path: inode → SI index block → data block at position ${idxInSI}`);
+    extra.push(`Disk accesses: read inode (1) + read SI block (1) + read data block (1) = <strong>3 total</strong>`);
+  } else if (blockNum < TI_START) {
+    levelClass = 'di';
+    levelName = 'Double Indirect';
+    diskAccesses = 4;
+    const idxInDI = blockNum - DI_START;
+    const outerIdx = Math.floor(idxInDI / ppb);
+    const innerIdx = idxInDI % ppb;
+    extra.push(`Block ${blockNum} ≥ ${DI_START} and < ${TI_START} → Double Indirect range`);
+    extra.push(`Index into DI range = ${blockNum} − ${DI_START} = <code>${idxInDI}</code>`);
+    extra.push(`Outer index (L1 block) = ⌊${idxInDI} / ${ppb}⌋ = <code>${outerIdx}</code>`);
+    extra.push(`Inner index (L2 block) = ${idxInDI} mod ${ppb} = <code>${innerIdx}</code>`);
+    extra.push(`Path: inode → DI block[${outerIdx}] → inner block[${innerIdx}] → data block`);
+    extra.push(`Disk accesses: inode + DI outer + DI inner + data = <strong>4 total</strong>`);
+  } else if (blockNum < MAX_BLOCK) {
+    levelClass = 'ti';
+    levelName = 'Triple Indirect';
+    diskAccesses = 5;
+    const idxInTI = blockNum - TI_START;
+    const l1 = Math.floor(idxInTI / (ppb * ppb));
+    const l2 = Math.floor((idxInTI % (ppb * ppb)) / ppb);
+    const l3 = idxInTI % ppb;
+    extra.push(`Block ${blockNum} ≥ ${TI_START} → Triple Indirect range`);
+    extra.push(`Index into TI range = ${blockNum} − ${TI_START} = <code>${idxInTI}</code>`);
+    extra.push(`L1 index = <code>${l1}</code>, L2 index = <code>${l2}</code>, L3 index = <code>${l3}</code>`);
+    extra.push(`Path: inode → TI[${l1}] → L2[${l2}] → L3[${l3}] → data block`);
+    extra.push(`Disk accesses: inode + 3 index reads + data = <strong>5 total</strong>`);
+  } else {
+    levelClass = 'out';
+    levelName = 'Out of range';
+    diskAccesses = 0;
+    extra.push(`Block ${blockNum} exceeds maximum (${MAX_BLOCK.toLocaleString()} blocks with these parameters).`);
+    extra.push(`Consider increasing block size or using a filesystem with extents (ext4).`);
+  }
+
+  extra.forEach(t => steps.push({ text: t }));
+
+  const stepsHTML = steps.map((s, i) =>
+    `<li><div class="step-num">${i+1}</div><div class="step-text" style="padding-top:2px">${s.text}</div></li>`
+  ).join('');
+
+  const summaryHTML = diskAccesses > 0
+    ? `<div class="result-summary ${levelClass}">
+        <strong>${levelName} range</strong> — Block number <code>${blockNum}</code><br>
+        Total disk I/Os required: <strong>${diskAccesses}</strong>
+       </div>`
+    : `<div class="result-summary out">Offset ${offset} is beyond maximum file size for these parameters.</div>`;
+
+  document.getElementById('trav-result').innerHTML = `
+    <h3>Traversal for offset ${offset.toLocaleString()} bytes</h3>
+    <ul class="step-list">${stepsHTML}</ul>
+    ${summaryHTML}`;
+}
+
+// ============================================================
+// INIT
+// ============================================================
+window.onload = () => {
+  buildInodeSlots();
+  calcUpdate();
+};
+</script>
+</body>
+</html>

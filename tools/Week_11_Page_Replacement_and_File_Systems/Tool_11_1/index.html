@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CS4023 – Tool 11.1 Page Replacement Racer</title>
+<style>
+  :root {
+    --navy: #1a1a2e;
+    --navy2: #16213e;
+    --orange: #e94560;
+    --accent: #f5a623;
+    --green: #27ae60;
+    --red: #e74c3c;
+    --text: #e0e0e0;
+    --muted: #888;
+    --border: #2d2d4e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--navy); color: var(--text); font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+  header { background: var(--navy2); border-bottom: 2px solid var(--orange); padding: 12px 24px; display: flex; align-items: center; gap: 16px; }
+  header h1 { font-size: 1.1rem; color: var(--accent); }
+  header span { font-size: 0.85rem; color: var(--muted); }
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--navy2); padding: 0 24px; }
+  .tab { padding: 10px 20px; cursor: pointer; font-size: 0.9rem; color: var(--muted); border-bottom: 3px solid transparent; transition: all 0.2s; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab:hover { color: var(--text); }
+  .panel { display: none; padding: 24px; }
+  .panel.active { display: block; }
+
+  /* Controls */
+  .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
+  .controls label { font-size: 0.85rem; color: var(--muted); }
+  .controls input[type=text] { background: var(--navy2); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 4px; font-size: 0.9rem; width: 320px; }
+  .controls input[type=number] { background: var(--navy2); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 4px; font-size: 0.9rem; width: 60px; }
+  button { background: var(--orange); color: #fff; border: none; padding: 7px 16px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: opacity 0.2s; }
+  button:hover { opacity: 0.85; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-secondary { background: var(--navy2); border: 1px solid var(--border); color: var(--text); }
+
+  /* Race columns */
+  .race-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .algo-col { background: var(--navy2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .algo-col h3 { text-align: center; padding: 10px; font-size: 1rem; border-bottom: 1px solid var(--border); }
+  .algo-col h3.fifo { background: #1a2a4a; color: #74b9ff; }
+  .algo-col h3.lru  { background: #1a3a2a; color: #55efc4; }
+  .algo-col h3.clock{ background: #3a2a1a; color: #ffeaa7; }
+  .frames-area { display: flex; gap: 8px; justify-content: center; padding: 14px; border-bottom: 1px solid var(--border); }
+  .frame-box { width: 52px; height: 52px; border: 2px solid var(--border); border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 1rem; font-weight: 700; transition: all 0.2s; }
+  .frame-box .label { font-size: 0.6rem; color: var(--muted); margin-bottom: 2px; }
+  .frame-box.fault { border-color: var(--red); background: rgba(231,76,60,0.15); }
+  .frame-box.hit   { border-color: var(--green); background: rgba(39,174,96,0.15); }
+  .frame-box .ref-bit { font-size: 0.65rem; color: var(--accent); }
+  .fault-counter { text-align: center; padding: 8px; font-size: 0.85rem; border-top: 1px solid var(--border); }
+  .fault-counter span { color: var(--red); font-weight: 700; font-size: 1.1rem; }
+
+  /* Trace table */
+  .trace-table-wrap { max-height: 280px; overflow-y: auto; }
+  .trace-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+  .trace-table th { background: var(--border); padding: 5px 8px; text-align: center; position: sticky; top: 0; }
+  .trace-table td { padding: 4px 8px; text-align: center; border-bottom: 1px solid var(--border); }
+  .trace-table tr.active-row td { background: rgba(245,166,35,0.15); }
+  .hit-cell  { color: var(--green); font-weight: 700; }
+  .fault-cell { color: var(--red); font-weight: 700; }
+
+  /* Belady chart */
+  .belady-container { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .chart-wrap { background: var(--navy2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .chart-wrap h3 { margin-bottom: 12px; font-size: 0.95rem; color: var(--accent); }
+  .bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 160px; padding: 8px 0; }
+  .bar-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .bar { width: 100%; background: #74b9ff; border-radius: 3px 3px 0 0; transition: height 0.3s; position: relative; min-height: 4px; }
+  .bar.anomaly { background: var(--red); }
+  .bar-label { font-size: 0.75rem; color: var(--muted); }
+  .bar-val { font-size: 0.72rem; color: var(--text); }
+  .anomaly-badge { background: var(--red); color: #fff; font-size: 0.7rem; padding: 2px 5px; border-radius: 3px; margin-top: 2px; }
+  .belady-explain { background: var(--navy2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; font-size: 0.88rem; line-height: 1.6; color: var(--text); }
+  .belady-explain h3 { color: var(--accent); margin-bottom: 10px; }
+  .highlight-anomaly { color: var(--red); font-weight: 700; }
+  .no-anomaly { color: var(--green); font-weight: 700; }
+
+  /* Build your own */
+  .byo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .byo-results { }
+  .summary-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-top: 12px; }
+  .summary-table th, .summary-table td { padding: 8px 14px; border: 1px solid var(--border); text-align: center; }
+  .summary-table th { background: var(--border); }
+  .summary-table .best { color: var(--green); font-weight: 700; }
+  .byo-trace { margin-top: 16px; }
+  .byo-trace h4 { color: var(--accent); margin-bottom: 8px; font-size: 0.9rem; }
+
+  .info-box { background: var(--navy2); border-left: 3px solid var(--accent); padding: 10px 14px; border-radius: 0 6px 6px 0; font-size: 0.85rem; line-height: 1.5; margin-bottom: 16px; }
+  .step-info { text-align: center; font-size: 0.85rem; color: var(--muted); margin: 8px 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>CS4023 – Tool 11.1: Page Replacement Racer</h1>
+  <span>L11.1 – Virtual Memory: Page Replacement</span>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('racer')">Algorithm Racer</div>
+  <div class="tab" onclick="switchTab('belady')">Belady's Anomaly</div>
+  <div class="tab" onclick="switchTab('byo')">Build Your Own</div>
+</div>
+
+<!-- TAB 1: Algorithm Racer -->
+<div id="tab-racer" class="panel active">
+  <div class="info-box">
+    Race FIFO, LRU, and Clock (second-chance) on the same reference string. Use <strong>Step</strong> to advance one reference at a time, or <strong>Play</strong> to animate.
+  </div>
+  <div class="controls">
+    <label>Reference string:</label>
+    <input type="text" id="racer-ref" value="7 0 1 2 0 3 0 4 2 3 0 3 2">
+    <label>Frames:</label>
+    <input type="number" id="racer-frames" value="3" min="1" max="8">
+    <button onclick="racerInit()">Load</button>
+    <button onclick="racerStep()" id="btn-step">Step →</button>
+    <button onclick="racerPlay()" id="btn-play">▶ Play</button>
+    <button onclick="racerPause()" id="btn-pause" disabled>⏸ Pause</button>
+    <button onclick="racerReset()" class="btn-secondary">Reset</button>
+  </div>
+  <div class="step-info" id="step-info">Step 0 of 0 — Load a reference string to begin.</div>
+  <div class="race-grid">
+    <div class="algo-col">
+      <h3 class="fifo">FIFO</h3>
+      <div class="frames-area" id="fifo-frames"></div>
+      <div class="fault-counter">Faults: <span id="fifo-fault-count">0</span></div>
+      <div class="trace-table-wrap"><table class="trace-table" id="fifo-trace"><thead><tr><th>Ref</th><th>F0</th><th>F1</th><th>F2</th><th>Result</th></tr></thead><tbody></tbody></table></div>
+    </div>
+    <div class="algo-col">
+      <h3 class="lru">LRU</h3>
+      <div class="frames-area" id="lru-frames"></div>
+      <div class="fault-counter">Faults: <span id="lru-fault-count">0</span></div>
+      <div class="trace-table-wrap"><table class="trace-table" id="lru-trace"><thead><tr><th>Ref</th><th>F0</th><th>F1</th><th>F2</th><th>Result</th></tr></thead><tbody></tbody></table></div>
+    </div>
+    <div class="algo-col">
+      <h3 class="clock">Clock</h3>
+      <div class="frames-area" id="clock-frames"></div>
+      <div class="fault-counter">Faults: <span id="clock-fault-count">0</span></div>
+      <div class="trace-table-wrap"><table class="trace-table" id="clock-trace"><thead><tr><th>Ref</th><th>F0</th><th>F1</th><th>F2</th><th>R-bits</th><th>Result</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 2: Belady's Anomaly -->
+<div id="tab-belady" class="panel">
+  <div class="info-box">
+    FIFO is <strong>not a stack algorithm</strong> — increasing frame count does <em>not</em> guarantee fewer page faults. Drag the slider to see Belady's Anomaly on the classic reference string.
+  </div>
+  <div class="controls">
+    <label>Reference string: <strong>1 2 3 4 1 2 5 1 2 3 4 5</strong></label>
+    <label>Max frames to show:</label>
+    <input type="number" id="belady-max" value="6" min="2" max="8" onchange="beladyUpdate()">
+  </div>
+  <div class="belady-container">
+    <div class="chart-wrap">
+      <h3>FIFO — Fault Count vs Frame Count</h3>
+      <div class="bar-chart" id="fifo-bar-chart"></div>
+      <p style="font-size:0.75rem;color:var(--muted);margin-top:4px;text-align:center">Frame count (x-axis) → Fault count (bars)</p>
+    </div>
+    <div class="chart-wrap">
+      <h3>LRU — Fault Count vs Frame Count (no anomaly)</h3>
+      <div class="bar-chart" id="lru-bar-chart"></div>
+      <p style="font-size:0.75rem;color:var(--muted);margin-top:4px;text-align:center">LRU is a stack algorithm — more frames ≤ faults</p>
+    </div>
+    <div class="belady-explain" style="grid-column:1/-1">
+      <h3>What is Belady's Anomaly?</h3>
+      <p>On the reference string <strong>1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5</strong>:</p>
+      <ul style="margin-top:8px;padding-left:20px;line-height:1.8">
+        <li>FIFO with <strong>3 frames: 9 faults</strong></li>
+        <li>FIFO with <strong>4 frames: <span class="highlight-anomaly">10 faults</span></strong> ← MORE frames, MORE faults!</li>
+      </ul>
+      <p style="margin-top:10px"><span class="highlight-anomaly">FIFO</span> is not a stack algorithm — its set of pages with <em>n+1</em> frames is not always a superset of pages with <em>n</em> frames.</p>
+      <p style="margin-top:8px"><span class="no-anomaly">LRU and OPT are stack algorithms</span> — they are immune to Belady's anomaly. More frames always means ≤ page faults.</p>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 3: Build Your Own -->
+<div id="tab-byo" class="panel">
+  <div class="info-box">
+    Enter any reference string and frame count. Select algorithms and click <strong>Run</strong> to compare fault counts and see full traces.
+  </div>
+  <div class="controls">
+    <label>Reference string:</label>
+    <input type="text" id="byo-ref" value="1 2 3 4 1 2 5 1 2 3 4 5" style="width:280px">
+    <label>Frames:</label>
+    <input type="number" id="byo-frames" value="3" min="1" max="8">
+    <label>Algorithms:</label>
+    <label><input type="checkbox" id="byo-fifo" checked> FIFO</label>
+    <label><input type="checkbox" id="byo-lru" checked> LRU</label>
+    <label><input type="checkbox" id="byo-clock" checked> Clock</label>
+    <label><input type="checkbox" id="byo-opt"> OPT</label>
+    <button onclick="byoRun()">Run</button>
+  </div>
+  <div id="byo-results"></div>
+</div>
+
+<script>
+// ============================================================
+// PAGE REPLACEMENT ALGORITHMS
+// ============================================================
+
+function parsePage(s) {
+  return s.trim().split(/[\s,]+/).map(Number).filter(n => !isNaN(n) && n >= 0);
+}
+
+// Returns [{ref, frames: [...], fault, evicted, extra}, ...]
+function runFIFO(refs, n) {
+  const frames = Array(n).fill(-1);
+  const queue = []; // FIFO queue of frame indices
+  return refs.map(ref => {
+    const idx = frames.indexOf(ref);
+    if (idx !== -1) {
+      return { ref, frames: [...frames], fault: false };
+    } else {
+      let evictIdx;
+      if (frames.includes(-1)) {
+        evictIdx = frames.indexOf(-1);
+      } else {
+        evictIdx = queue.shift();
+      }
+      frames[evictIdx] = ref;
+      queue.push(evictIdx);
+      return { ref, frames: [...frames], fault: true };
+    }
+  });
+}
+
+function runLRU(refs, n) {
+  const frames = Array(n).fill(-1);
+  const lastUsed = Array(n).fill(-1);
+  return refs.map((ref, t) => {
+    const idx = frames.indexOf(ref);
+    if (idx !== -1) {
+      lastUsed[idx] = t;
+      return { ref, frames: [...frames], fault: false };
+    } else {
+      let evictIdx;
+      if (frames.includes(-1)) {
+        evictIdx = frames.indexOf(-1);
+      } else {
+        evictIdx = lastUsed.indexOf(Math.min(...lastUsed));
+      }
+      frames[evictIdx] = ref;
+      lastUsed[evictIdx] = t;
+      return { ref, frames: [...frames], fault: true };
+    }
+  });
+}
+
+function runClock(refs, n) {
+  const frames = Array(n).fill(-1);
+  const refBits = Array(n).fill(0);
+  let hand = 0;
+  return refs.map(ref => {
+    const idx = frames.indexOf(ref);
+    if (idx !== -1) {
+      refBits[idx] = 1;
+      return { ref, frames: [...frames], fault: false, refBits: [...refBits], hand };
+    } else {
+      if (frames.includes(-1)) {
+        const slot = frames.indexOf(-1);
+        frames[slot] = ref;
+        refBits[slot] = 1;
+        hand = (slot + 1) % n;
+        return { ref, frames: [...frames], fault: true, refBits: [...refBits], hand };
+      }
+      // sweep
+      while (refBits[hand] === 1) {
+        refBits[hand] = 0;
+        hand = (hand + 1) % n;
+      }
+      frames[hand] = ref;
+      refBits[hand] = 1;
+      hand = (hand + 1) % n;
+      return { ref, frames: [...frames], fault: true, refBits: [...refBits], hand };
+    }
+  });
+}
+
+function runOPT(refs, n) {
+  const frames = Array(n).fill(-1);
+  return refs.map((ref, t) => {
+    const idx = frames.indexOf(ref);
+    if (idx !== -1) {
+      return { ref, frames: [...frames], fault: false };
+    } else {
+      let evictIdx;
+      if (frames.includes(-1)) {
+        evictIdx = frames.indexOf(-1);
+      } else {
+        // find page whose next use is farthest
+        const nextUse = frames.map(p => {
+          const fu = refs.slice(t + 1).indexOf(p);
+          return fu === -1 ? Infinity : fu;
+        });
+        evictIdx = nextUse.indexOf(Math.max(...nextUse));
+      }
+      frames[evictIdx] = ref;
+      return { ref, frames: [...frames], fault: true };
+    }
+  });
+}
+
+// ============================================================
+// TAB SWITCHING
+// ============================================================
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', ['racer','belady','byo'][i] === name);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'belady') beladyUpdate();
+}
+
+// ============================================================
+// RACER TAB
+// ============================================================
+let racerState = null;
+let racerTimer = null;
+
+function racerInit() {
+  racerPause();
+  const refs = parsePage(document.getElementById('racer-ref').value);
+  const n = parseInt(document.getElementById('racer-frames').value) || 3;
+  if (!refs.length) return;
+
+  const fifo  = runFIFO(refs, n);
+  const lru   = runLRU(refs, n);
+  const clock = runClock(refs, n);
+
+  racerState = { refs, n, fifo, lru, clock, step: 0 };
+
+  // rebuild table headers
+  ['fifo','lru'].forEach(alg => {
+    const t = document.getElementById(alg + '-trace');
+    const hdr = t.querySelector('thead tr');
+    hdr.innerHTML = '<th>Ref</th>' + Array.from({length:n},(_,i)=>`<th>F${i}</th>`).join('') + '<th>Result</th>';
+    t.querySelector('tbody').innerHTML = '';
+  });
+  const clkT = document.getElementById('clock-trace');
+  const clkHdr = clkT.querySelector('thead tr');
+  clkHdr.innerHTML = '<th>Ref</th>' + Array.from({length:n},(_,i)=>`<th>F${i}</th>`).join('') + '<th>R-bits</th><th>Result</th>';
+  clkT.querySelector('tbody').innerHTML = '';
+
+  updateFrameBoxes('fifo-frames', n, Array(n).fill(-1), []);
+  updateFrameBoxes('lru-frames', n, Array(n).fill(-1), []);
+  updateFrameBoxes('clock-frames', n, Array(n).fill(-1), Array(n).fill(0));
+  document.getElementById('fifo-fault-count').textContent = '0';
+  document.getElementById('lru-fault-count').textContent = '0';
+  document.getElementById('clock-fault-count').textContent = '0';
+  document.getElementById('step-info').textContent = `Step 0 of ${refs.length} — press Step or Play.`;
+  document.getElementById('btn-step').disabled = false;
+}
+
+function updateFrameBoxes(containerId, n, frames, refBits) {
+  const c = document.getElementById(containerId);
+  c.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const box = document.createElement('div');
+    box.className = 'frame-box';
+    box.innerHTML = `<div class="label">F${i}</div><div>${frames[i] === -1 ? '—' : frames[i]}</div>` +
+      (refBits.length ? `<div class="ref-bit">R=${refBits[i]||0}</div>` : '');
+    c.appendChild(box);
+  }
+}
+
+function addTraceRow(tableId, stepData, n, isClock) {
+  const tbody = document.getElementById(tableId).querySelector('tbody');
+  const tr = document.createElement('tr');
+  tr.className = 'active-row';
+  // remove previous active
+  tbody.querySelectorAll('tr.active-row').forEach(r => r.classList.remove('active-row'));
+  const result = stepData.fault
+    ? `<td class="fault-cell">FAULT</td>`
+    : `<td class="hit-cell">HIT</td>`;
+  const frameCells = Array.from({length:n}, (_,i) =>
+    `<td>${stepData.frames[i] === -1 ? '—' : stepData.frames[i]}</td>`).join('');
+  const rbits = isClock ? `<td>${(stepData.refBits||[]).join(',')}</td>` : '';
+  tr.innerHTML = `<td><strong>${stepData.ref}</strong></td>${frameCells}${rbits}${result}`;
+  tbody.appendChild(tr);
+  tr.scrollIntoView({ block: 'nearest' });
+}
+
+function racerStep() {
+  if (!racerState) { racerInit(); return; }
+  const s = racerState;
+  if (s.step >= s.refs.length) {
+    document.getElementById('step-info').textContent = 'All references processed.';
+    document.getElementById('btn-step').disabled = true;
+    return;
+  }
+  const i = s.step;
+  const fd = s.fifo[i], ld = s.lru[i], cd = s.clock[i];
+  const n = s.n;
+
+  updateFrameBoxes('fifo-frames', n, fd.frames, []);
+  updateFrameBoxes('lru-frames', n, ld.frames, []);
+  updateFrameBoxes('clock-frames', n, cd.frames, cd.refBits || []);
+
+  addTraceRow('fifo-trace', fd, n, false);
+  addTraceRow('lru-trace', ld, n, false);
+  addTraceRow('clock-trace', cd, n, true);
+
+  const fifoFaults = s.fifo.slice(0, i+1).filter(x=>x.fault).length;
+  const lruFaults  = s.lru.slice(0, i+1).filter(x=>x.fault).length;
+  const clkFaults  = s.clock.slice(0, i+1).filter(x=>x.fault).length;
+  document.getElementById('fifo-fault-count').textContent = fifoFaults;
+  document.getElementById('lru-fault-count').textContent  = lruFaults;
+  document.getElementById('clock-fault-count').textContent = clkFaults;
+
+  s.step++;
+  document.getElementById('step-info').textContent = `Step ${s.step} of ${s.refs.length} — Ref: ${fd.ref}`;
+  if (s.step >= s.refs.length) {
+    document.getElementById('btn-step').disabled = true;
+    racerPause();
+    document.getElementById('step-info').textContent =
+      `Done! FIFO: ${fifoFaults} faults | LRU: ${lruFaults} faults | Clock: ${clkFaults} faults`;
+  }
+}
+
+function racerPlay() {
+  document.getElementById('btn-play').disabled = true;
+  document.getElementById('btn-pause').disabled = false;
+  racerTimer = setInterval(() => {
+    if (!racerState || racerState.step >= racerState.refs.length) { racerPause(); return; }
+    racerStep();
+  }, 800);
+}
+
+function racerPause() {
+  clearInterval(racerTimer);
+  document.getElementById('btn-play').disabled = false;
+  document.getElementById('btn-pause').disabled = true;
+}
+
+function racerReset() {
+  racerPause();
+  racerState = null;
+  document.getElementById('step-info').textContent = 'Reset. Press Load to start.';
+  ['fifo','lru','clock'].forEach(a => {
+    document.getElementById(a+'-fault-count').textContent = '0';
+    const tbody = document.getElementById(a+'-trace').querySelector('tbody');
+    if (tbody) tbody.innerHTML = '';
+    const n = parseInt(document.getElementById('racer-frames').value)||3;
+    updateFrameBoxes(a+'-frames', n, Array(n).fill(-1), []);
+  });
+  document.getElementById('btn-step').disabled = false;
+}
+
+// ============================================================
+// BELADY TAB
+// ============================================================
+const BELADY_REF = [1,2,3,4,1,2,5,1,2,3,4,5];
+
+function countFaults(results) { return results.filter(r=>r.fault).length; }
+
+function beladyUpdate() {
+  const maxF = parseInt(document.getElementById('belady-max').value) || 6;
+  const fifoData = [], lruData = [];
+  for (let f = 1; f <= maxF; f++) {
+    fifoData.push({ f, faults: countFaults(runFIFO(BELADY_REF, f)) });
+    lruData.push({ f, faults: countFaults(runLRU(BELADY_REF, f)) });
+  }
+  renderBarChart('fifo-bar-chart', fifoData, true);
+  renderBarChart('lru-bar-chart', lruData, false);
+}
+
+function renderBarChart(containerId, data, markAnomaly) {
+  const c = document.getElementById(containerId);
+  c.innerHTML = '';
+  const maxFault = Math.max(...data.map(d=>d.faults), 1);
+  let prevFaults = data[0]?.faults;
+  data.forEach((d, i) => {
+    const isAnomaly = markAnomaly && i > 0 && d.faults > prevFaults;
+    const item = document.createElement('div');
+    item.className = 'bar-item';
+    const barH = Math.round((d.faults / maxFault) * 140);
+    item.innerHTML = `
+      <div class="bar-val">${d.faults}</div>
+      <div class="bar ${isAnomaly ? 'anomaly' : ''}" style="height:${barH}px"></div>
+      <div class="bar-label">${d.f} fr</div>
+      ${isAnomaly ? '<div class="anomaly-badge">↑ Belady!</div>' : ''}
+    `;
+    c.appendChild(item);
+    prevFaults = d.faults;
+  });
+}
+
+// ============================================================
+// BUILD YOUR OWN TAB
+// ============================================================
+function byoRun() {
+  const refs = parsePage(document.getElementById('byo-ref').value);
+  const n = parseInt(document.getElementById('byo-frames').value) || 3;
+  if (!refs.length) return;
+
+  const selected = {
+    FIFO:  document.getElementById('byo-fifo').checked,
+    LRU:   document.getElementById('byo-lru').checked,
+    Clock: document.getElementById('byo-clock').checked,
+    OPT:   document.getElementById('byo-opt').checked,
+  };
+  const algFns = { FIFO: runFIFO, LRU: runLRU, Clock: runClock, OPT: runOPT };
+  const results = {};
+  Object.keys(selected).filter(k=>selected[k]).forEach(k => {
+    results[k] = algFns[k](refs, n);
+  });
+
+  const faultCounts = Object.fromEntries(Object.entries(results).map(([k,v])=>[k, countFaults(v)]));
+  const minFaults = Math.min(...Object.values(faultCounts));
+
+  let html = '<div class="byo-results">';
+  // Summary table
+  html += '<table class="summary-table"><thead><tr><th>Algorithm</th><th>Faults</th><th>Hit Rate</th></tr></thead><tbody>';
+  Object.entries(faultCounts).forEach(([alg, fc]) => {
+    const hr = (((refs.length - fc) / refs.length) * 100).toFixed(1);
+    html += `<tr><td>${alg}</td><td class="${fc === minFaults ? 'best' : ''}">${fc}</td><td>${hr}%</td></tr>`;
+  });
+  html += '</tbody></table>';
+
+  // Trace tables
+  Object.entries(results).forEach(([alg, data]) => {
+    html += `<div class="byo-trace"><h4>${alg} — Full Trace (${faultCounts[alg]} faults)</h4>`;
+    html += `<div class="trace-table-wrap"><table class="trace-table"><thead><tr><th>Ref</th>`;
+    for (let i = 0; i < n; i++) html += `<th>F${i}</th>`;
+    if (alg === 'Clock') html += '<th>R-bits</th>';
+    html += '<th>Result</th></tr></thead><tbody>';
+    data.forEach(d => {
+      html += `<tr><td><strong>${d.ref}</strong></td>`;
+      for (let i = 0; i < n; i++) html += `<td>${d.frames[i]===-1?'—':d.frames[i]}</td>`;
+      if (alg === 'Clock') html += `<td>${(d.refBits||[]).join(',')}</td>`;
+      html += d.fault ? `<td class="fault-cell">FAULT</td>` : `<td class="hit-cell">HIT</td>`;
+      html += '</tr>';
+    });
+    html += '</tbody></table></div></div>';
+  });
+
+  html += '</div>';
+  document.getElementById('byo-results').innerHTML = html;
+}
+
+// ============================================================
+// INIT
+// ============================================================
+window.onload = () => {
+  racerInit();
+  beladyUpdate();
+};
+</script>
+</body>
+</html>
