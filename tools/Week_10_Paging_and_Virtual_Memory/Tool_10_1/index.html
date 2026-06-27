@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tool 10.1 – Page Table Walker</title>
+<style>
+  :root {
+    --navy: #0d1b2a; --navy2: #1a2e44; --orange: #ff8c00;
+    --green: #22c55e; --red: #ef4444; --blue: #3b82f6; --teal: #06b6d4;
+    --text: #e2e8f0; --muted: #94a3b8; --border: #2d4a6a; --card: #162235;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: var(--navy); color: var(--text); min-height: 100vh; }
+  header { background: var(--navy2); border-bottom: 2px solid var(--orange); padding: 14px 24px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 1.2rem; color: var(--orange); }
+  header span { color: var(--muted); font-size: 0.85rem; }
+  .tabs { display: flex; border-bottom: 2px solid var(--border); background: var(--navy2); }
+  .tab { padding: 10px 24px; cursor: pointer; color: var(--muted); font-size: 0.9rem; border-bottom: 3px solid transparent; transition: all 0.2s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--orange); border-bottom-color: var(--orange); }
+  .panel { display: none; padding: 20px; }
+  .panel.active { display: block; }
+  .explain { background: var(--card); border-left: 4px solid var(--orange); border-radius: 6px; padding: 12px 16px; margin-bottom: 18px; font-size: 0.85rem; color: var(--muted); line-height: 1.6; }
+  .explain strong { color: var(--text); }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; flex: 1; min-width: 280px; }
+  .card h3 { color: var(--orange); margin-bottom: 12px; font-size: 0.95rem; }
+  label { font-size: 0.82rem; color: var(--muted); display: block; margin-bottom: 4px; }
+  input, select { width: 100%; padding: 7px 10px; background: var(--navy2); border: 1px solid var(--border); border-radius: 5px; color: var(--text); font-size: 0.85rem; margin-bottom: 10px; }
+  .btn { padding: 8px 18px; border: none; border-radius: 5px; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: opacity 0.2s; margin: 3px; }
+  .btn-orange { background: var(--orange); color: #fff; }
+  .btn-blue { background: var(--blue); color: #fff; }
+  .btn-green { background: var(--green); color: #fff; }
+  .btn-grey { background: #334155; color: var(--text); }
+  .btn:hover { opacity: 0.85; }
+  .result-box { background: var(--navy2); border: 1px solid var(--border); border-radius: 6px; padding: 14px; margin-top: 12px; font-size: 0.85rem; line-height: 1.7; min-height: 80px; }
+  .bit-vis { display: flex; gap: 2px; flex-wrap: wrap; margin: 8px 0; font-family: monospace; font-size: 0.8rem; }
+  .bit-vis .b-page { background: var(--orange); color: #000; padding: 2px 4px; border-radius: 2px; }
+  .bit-vis .b-off { background: var(--blue); color: #fff; padding: 2px 4px; border-radius: 2px; }
+  .bit-vis .b-label { color: var(--muted); padding: 2px 6px; font-size: 0.75rem; align-self: center; }
+  .pt-table { border-collapse: collapse; width: 100%; font-size: 0.82rem; margin: 8px 0; }
+  .pt-table th { background: var(--navy2); color: var(--muted); padding: 5px 10px; border: 1px solid var(--border); }
+  .pt-table td { border: 1px solid var(--border); padding: 4px 8px; }
+  .pt-table input { width: 60px; padding: 3px 6px; background: var(--navy); border: 1px solid var(--border); border-radius: 3px; color: var(--text); text-align: center; margin: 0; font-size: 0.82rem; }
+  .pt-table .hl { background: rgba(255,140,0,0.15); }
+  .hit { color: var(--green); font-weight: 700; }
+  .miss { color: var(--red); font-weight: 700; }
+  .tlb-table { border-collapse: collapse; width: 100%; font-size: 0.82rem; margin: 8px 0; }
+  .tlb-table th { background: var(--navy2); color: var(--muted); padding: 5px 8px; border: 1px solid var(--border); }
+  .tlb-table td { border: 1px solid var(--border); padding: 4px 8px; text-align: center; transition: background 0.4s; }
+  .tlb-hit-row { background: rgba(34,197,94,0.2) !important; }
+  .tlb-miss-row { background: rgba(239,68,68,0.15) !important; }
+  .step-list { list-style: none; margin: 8px 0; }
+  .step-list li { padding: 6px 10px; border-left: 3px solid var(--border); margin-bottom: 4px; font-size: 0.83rem; color: var(--muted); transition: all 0.3s; }
+  .step-list li.active { border-left-color: var(--orange); color: var(--text); background: rgba(255,140,0,0.08); }
+  .stat { display: inline-block; background: var(--navy2); border: 1px solid var(--border); border-radius: 5px; padding: 6px 14px; margin: 4px; font-size: 0.85rem; }
+  .stat .val { color: var(--orange); font-weight: 700; font-size: 1.1rem; }
+  .eat-formula { background: var(--navy2); border: 1px solid var(--teal); border-radius: 6px; padding: 14px; font-family: monospace; font-size: 0.88rem; color: var(--teal); margin: 10px 0; line-height: 1.8; }
+  canvas { display: block; margin-top: 12px; }
+  .range-row { display: flex; gap: 10px; align-items: center; }
+  .range-row input[type=range] { flex: 1; accent-color: var(--orange); }
+  .range-row span { min-width: 50px; text-align: right; color: var(--orange); font-weight: 700; }
+  .fault { color: var(--red); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 700; }
+  .badge-green { background: rgba(34,197,94,0.2); color: var(--green); }
+  .badge-red { background: rgba(239,68,68,0.2); color: var(--red); }
+  .overhead-table { border-collapse: collapse; width: 100%; font-size: 0.8rem; }
+  .overhead-table th, .overhead-table td { border: 1px solid var(--border); padding: 5px 10px; }
+  .overhead-table th { background: var(--navy2); color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Tool 10.1 — Page Table Walker</h1>
+  <span>CS4023 Operating Systems · Week 10</span>
+</header>
+<div class="tabs">
+  <div class="tab active" onclick="switchTab(0)">Address Translator</div>
+  <div class="tab" onclick="switchTab(1)">TLB Simulator</div>
+  <div class="tab" onclick="switchTab(2)">EAT Calculator</div>
+</div>
+
+<!-- TAB 1: Address Translator -->
+<div class="panel active" id="tab0">
+  <div class="explain">
+    <strong>Address Translation:</strong> every virtual address is split into a <span style="color:var(--orange)">page number</span> and a <span style="color:var(--blue)">page offset</span>.
+    The OS stores a <em>page table</em> mapping page numbers to physical frame numbers. Enter a virtual address and page size, then click <strong>Decompose</strong>.
+  </div>
+  <div class="row">
+    <div class="card" style="max-width:380px">
+      <h3>Inputs</h3>
+      <label>Virtual Address (hex, e.g. 0x3A1F)</label>
+      <input id="va-input" type="text" value="0x3A1F" />
+      <label>Page Size</label>
+      <select id="pg-size">
+        <option value="256">256 B (8-bit offset)</option>
+        <option value="4096" selected>4 KB (12-bit offset)</option>
+        <option value="65536">64 KB (16-bit offset)</option>
+        <option value="2097152">2 MB (21-bit offset)</option>
+      </select>
+      <label>Address bits (e.g. 16 or 32)</label>
+      <input id="addr-bits" type="number" value="16" min="8" max="64" />
+      <button class="btn btn-orange" onclick="doDecompose()">Decompose</button>
+      <button class="btn btn-blue" onclick="doTranslate()">Translate</button>
+      <button class="btn btn-grey" onclick="doAnimate()">Step-by-step</button>
+    </div>
+    <div class="card" style="flex:2">
+      <h3>Bit Decomposition</h3>
+      <div id="bit-decomp" class="result-box" style="font-family:monospace">Enter a virtual address and click Decompose.</div>
+      <h3 style="margin-top:14px">Translation Result</h3>
+      <div id="trans-result" class="result-box">Click Translate to see the physical address.</div>
+    </div>
+  </div>
+  <div class="row" style="margin-top:16px">
+    <div class="card" style="flex:2">
+      <h3>Page Table <span style="font-size:0.75rem;color:var(--muted)">(edit frame numbers; uncheck = invalid/not present)</span></h3>
+      <div id="pt-container"></div>
+    </div>
+    <div class="card" style="max-width:320px">
+      <h3>Multi-level Mode</h3>
+      <label><input type="checkbox" id="ml-mode" onchange="buildPageTable()"> Enable 2-level page table</label>
+      <div id="ml-info" class="result-box" style="margin-top:8px;min-height:40px;font-size:0.82rem;color:var(--muted)">
+        In 2-level mode the page number is split into two equal halves — a directory index and a table index.
+      </div>
+      <div id="pt-overhead" style="margin-top:12px"></div>
+    </div>
+  </div>
+  <div id="step-anim" style="display:none;margin-top:16px">
+    <div class="card">
+      <h3>Step-by-step Animation</h3>
+      <ul class="step-list" id="steps-list"></ul>
+      <button class="btn btn-orange" onclick="nextStep()">Next Step ▶</button>
+      <button class="btn btn-grey" onclick="resetSteps()">Reset</button>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 2: TLB Simulator -->
+<div class="panel" id="tab1">
+  <div class="explain">
+    <strong>TLB Simulation:</strong> the Translation Lookaside Buffer is a small hardware cache (8 entries here) for recently-used page→frame mappings.
+    A <span class="hit">HIT</span> means the translation was found without a page-table walk. A <span class="miss">MISS</span> requires reading RAM.
+    The TLB uses <em>LRU eviction</em>.
+  </div>
+  <div class="row">
+    <div class="card" style="max-width:420px">
+      <h3>Reference String</h3>
+      <label>Space-separated page numbers (e.g. 3 7 3 12 7 4 3 5 7)</label>
+      <input id="ref-str" type="text" value="3 7 3 12 7 4 3 5 7 2 3 8" />
+      <label>Page → Frame mapping (page:frame pairs, e.g. 3:5 7:2 12:9)</label>
+      <input id="pf-map" type="text" value="3:5 7:2 12:9 4:11 5:6 2:8 8:3" />
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <button class="btn btn-orange" onclick="tlbStep()">Step ▶</button>
+        <button class="btn btn-blue" onclick="tlbPlay()">Play ▶▶</button>
+        <button class="btn btn-grey" onclick="tlbReset()">Reset</button>
+        <button class="btn btn-grey" onclick="tlbRandom()">Random Workload</button>
+      </div>
+      <div class="result-box" id="tlb-current" style="margin-top:10px">Press Step or Play to begin.</div>
+    </div>
+    <div class="card" style="flex:2">
+      <h3>TLB State (8-entry LRU)</h3>
+      <table class="tlb-table" id="tlb-state-tbl">
+        <thead><tr><th>#</th><th>Page</th><th>Frame</th><th>Valid</th><th>LRU order</th></tr></thead>
+        <tbody id="tlb-tbody"></tbody>
+      </table>
+      <div style="margin-top:10px">
+        <span class="stat">Hits: <span class="val" id="tlb-hits">0</span></span>
+        <span class="stat">Misses: <span class="val" id="tlb-misses">0</span></span>
+        <span class="stat">Hit Rate: <span class="val" id="tlb-rate">—</span></span>
+      </div>
+    </div>
+  </div>
+  <div class="row" style="margin-top:16px">
+    <div class="card">
+      <h3>Reference Trace</h3>
+      <div id="tlb-trace" style="font-family:monospace;font-size:0.82rem;line-height:2;word-break:break-all"></div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 3: EAT Calculator -->
+<div class="panel" id="tab2">
+  <div class="explain">
+    <strong>Effective Memory Access Time (EAT):</strong> when α (TLB hit rate) is high, most translations require only one RAM access.
+    A miss requires two (page table + data). Adding page-table levels adds extra accesses on a miss.
+  </div>
+  <div class="row">
+    <div class="card" style="max-width:380px">
+      <h3>Parameters</h3>
+      <label>TLB access time ε (ns)</label>
+      <input id="e-tlb" type="number" value="2" min="0" step="1" oninput="calcEAT()" />
+      <label>Memory access time t (ns)</label>
+      <input id="t-mem" type="number" value="100" min="1" step="1" oninput="calcEAT()" />
+      <label>TLB Hit Ratio α</label>
+      <div class="range-row">
+        <input type="range" id="alpha-slider" min="0" max="100" value="98" oninput="syncAlpha(this.value)" />
+        <span id="alpha-display">98%</span>
+      </div>
+      <label>Page table levels (extra miss penalty)</label>
+      <select id="pt-levels" onchange="calcEAT()">
+        <option value="1">1 level (flat)</option>
+        <option value="2" selected>2 levels</option>
+        <option value="4">4 levels (x86-64)</option>
+      </select>
+    </div>
+    <div class="card" style="flex:2">
+      <h3>Formula &amp; Result</h3>
+      <div class="eat-formula" id="eat-formula"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+        <span class="stat">EAT: <span class="val" id="eat-val">—</span> ns</span>
+        <span class="stat">Overhead vs ideal: <span class="val" id="eat-overhead">—</span></span>
+        <span class="stat">Without TLB: <span class="val" id="no-tlb">—</span> ns</span>
+      </div>
+      <h3 style="margin-top:16px">EAT vs Hit Ratio (graph)</h3>
+      <canvas id="eat-chart" width="540" height="220"></canvas>
+    </div>
+  </div>
+  <div class="row" style="margin-top:16px">
+    <div class="card">
+      <h3>Multi-level Overhead Calculator</h3>
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:10px">Given virtual address space and page size, compare single-level vs two-level page table memory usage.</p>
+      <div class="row">
+        <div style="flex:1">
+          <label>Virtual address bits</label>
+          <input id="va-bits-ov" type="number" value="32" min="16" max="48" oninput="calcOverhead()" />
+          <label>Page size (bytes)</label>
+          <input id="pg-bytes-ov" type="number" value="4096" min="256" oninput="calcOverhead()" />
+          <label>PTE size (bytes)</label>
+          <input id="pte-bytes-ov" type="number" value="4" min="4" oninput="calcOverhead()" />
+        </div>
+        <div style="flex:2">
+          <div id="overhead-result" class="result-box"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── SHARED STATE ──────────────────────────────────────────────────────────
+const NUM_PT_ENTRIES = 16;
+let pageTable = [];     // [{frame, valid}]
+for (let i = 0; i < NUM_PT_ENTRIES; i++) pageTable.push({ frame: i * 2 + 3, valid: true });
+
+let currentPageNum = 0, currentOffset = 0, currentPageBits = 0, currentOffBits = 0;
+let stepIndex = 0;
+const STEPS_TMPL = [
+  "1. Extract page number from virtual address (orange bits)",
+  "2. Extract offset from virtual address (blue bits)",
+  "3. Check TLB for page number",
+  "4. TLB miss → read page_table[page]",
+  "5. Check present bit in PTE",
+  "6. Compute physical address = (frame << offset_bits) | offset",
+  "7. Access physical memory at computed address"
+];
+
+// ─── TAB SWITCHING ─────────────────────────────────────────────────────────
+function switchTab(n) {
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === n));
+  document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === n));
+  if (n === 2) { calcEAT(); calcOverhead(); }
+}
+
+// ─── PAGE TABLE UI ─────────────────────────────────────────────────────────
+function buildPageTable() {
+  const ml = document.getElementById('ml-mode').checked;
+  const container = document.getElementById('pt-container');
+  let html = `<table class="pt-table"><thead><tr>
+    <th>Page #</th>${ml ? '<th>Dir idx</th><th>PT idx</th>' : ''}
+    <th>Frame #</th><th>Present</th>
+  </tr></thead><tbody>`;
+  for (let i = 0; i < NUM_PT_ENTRIES; i++) {
+    const e = pageTable[i];
+    let diridx = ml ? `<td>${(i >> 2) & 3}</td><td>${i & 3}</td>` : '';
+    html += `<tr id="ptr-${i}"><td>${i}</td>${diridx}
+      <td><input type="number" value="${e.frame}" min="0" max="63" onchange="pageTable[${i}].frame=+this.value" style="width:60px"></td>
+      <td><input type="checkbox" ${e.valid ? 'checked' : ''} onchange="pageTable[${i}].valid=this.checked"></td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  container.innerHTML = html;
+  updateOverheadPanel();
+}
+
+function updateOverheadPanel() {
+  const ml = document.getElementById('ml-mode').checked;
+  const div = document.getElementById('pt-overhead');
+  if (!ml) { div.innerHTML = ''; return; }
+  div.innerHTML = `<div class="result-box" style="font-size:0.82rem">
+    <strong>Two-level breakdown:</strong><br>
+    Page directory: 4 entries (bits 3–2)<br>
+    Page table per dir entry: 4 entries (bits 1–0)<br>
+    Only allocated for used dir entries → saves memory on sparse spaces.
+  </div>`;
+}
+
+buildPageTable();
+
+// ─── DECOMPOSE / TRANSLATE ─────────────────────────────────────────────────
+function parseVA() {
+  const raw = document.getElementById('va-input').value.trim();
+  return parseInt(raw, raw.startsWith('0x') || raw.startsWith('0X') ? 16 : 10);
+}
+
+function doDecompose() {
+  const va = parseVA();
+  if (isNaN(va)) { document.getElementById('bit-decomp').innerHTML = '<span style="color:var(--red)">Invalid address.</span>'; return; }
+  const pgBytes = parseInt(document.getElementById('pg-size').value);
+  const addrBits = parseInt(document.getElementById('addr-bits').value);
+  const offBits = Math.log2(pgBytes);
+  const pgBits = addrBits - offBits;
+  currentOffset = va & (pgBytes - 1);
+  currentPageNum = va >> offBits;
+  currentPageBits = pgBits; currentOffBits = offBits;
+
+  // binary string
+  const bin = va.toString(2).padStart(addrBits, '0');
+  const pageStr = bin.slice(0, pgBits);
+  const offStr = bin.slice(pgBits);
+
+  let bitsHtml = '<div class="bit-vis">';
+  bitsHtml += `<span class="b-label">bit ${addrBits-1}</span>`;
+  for (const b of pageStr) bitsHtml += `<span class="b-page">${b}</span>`;
+  bitsHtml += `<span class="b-label">| bit ${offBits-1}</span>`;
+  for (const b of offStr) bitsHtml += `<span class="b-off">${b}</span>`;
+  bitsHtml += `<span class="b-label">bit 0</span></div>`;
+  bitsHtml += `<div style="margin-top:8px;font-size:0.84rem">
+    <span style="color:var(--orange)">Page Number</span> = <strong>${pgBits} bits</strong> → value = <strong>${currentPageNum}</strong> (0x${currentPageNum.toString(16).toUpperCase()})<br>
+    <span style="color:var(--blue)">Offset</span> = <strong>${offBits} bits</strong> → value = <strong>${currentOffset}</strong> (0x${currentOffset.toString(16).toUpperCase()})
+  </div>`;
+  document.getElementById('bit-decomp').innerHTML = bitsHtml;
+  // highlight PT row
+  for (let i = 0; i < NUM_PT_ENTRIES; i++) {
+    const row = document.getElementById('ptr-' + i);
+    if (row) row.classList.toggle('hl', i === currentPageNum);
+  }
+}
+
+function doTranslate() {
+  doDecompose();
+  const result = document.getElementById('trans-result');
+  if (currentPageNum >= NUM_PT_ENTRIES) {
+    result.innerHTML = `<span class="fault">Page number ${currentPageNum} is outside the page table (${NUM_PT_ENTRIES} entries). Segmentation fault.</span>`; return;
+  }
+  const pte = pageTable[currentPageNum];
+  if (!pte.valid) {
+    result.innerHTML = `<span class="fault">⚠ PAGE FAULT — PTE[${currentPageNum}].present = 0. OS must load this page from disk into a free frame.</span>`; return;
+  }
+  const phys = (pte.frame << currentOffBits) | currentOffset;
+  result.innerHTML = `
+    <span style="color:var(--green)">✓ Translation success</span><br>
+    PTE[${currentPageNum}] → frame <strong>${pte.frame}</strong><br>
+    Physical = (${pte.frame} &lt;&lt; ${currentOffBits}) | ${currentOffset}<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = <strong>0x${phys.toString(16).toUpperCase()}</strong> = ${phys} decimal
+  `;
+}
+
+// ─── STEP ANIMATION ────────────────────────────────────────────────────────
+function doAnimate() {
+  doDecompose();
+  stepIndex = 0;
+  document.getElementById('step-anim').style.display = 'block';
+  const ul = document.getElementById('steps-list');
+  ul.innerHTML = STEPS_TMPL.map((s, i) => `<li id="step-${i}">${s}</li>`).join('');
+}
+function nextStep() {
+  if (stepIndex > 0) document.getElementById('step-' + (stepIndex - 1)).classList.remove('active');
+  if (stepIndex < STEPS_TMPL.length) {
+    document.getElementById('step-' + stepIndex).classList.add('active');
+    stepIndex++;
+  }
+}
+function resetSteps() { stepIndex = 0; document.querySelectorAll('.step-list li').forEach(l => l.classList.remove('active')); }
+
+// ─── TLB SIMULATOR ─────────────────────────────────────────────────────────
+let tlb = [];       // [{page, frame, valid, lru}]
+let tlbClock = 0;
+let refQueue = [];
+let refIdx = 0;
+let tlbHits = 0, tlbMisses = 0;
+let tlbPlayTimer = null;
+
+function parsePFMap() {
+  const pairs = document.getElementById('pf-map').value.trim().split(/\s+/);
+  const m = {};
+  for (const p of pairs) { const [pg, fr] = p.split(':'); if (pg !== undefined && fr !== undefined) m[+pg] = +fr; }
+  return m;
+}
+
+function tlbReset() {
+  clearInterval(tlbPlayTimer); tlbPlayTimer = null;
+  tlb = []; tlbClock = 0; refIdx = 0; tlbHits = 0; tlbMisses = 0;
+  refQueue = document.getElementById('ref-str').value.trim().split(/\s+/).map(Number);
+  renderTLB(); renderTrace();
+  document.getElementById('tlb-current').textContent = 'Press Step or Play to begin.';
+  document.getElementById('tlb-hits').textContent = '0';
+  document.getElementById('tlb-misses').textContent = '0';
+  document.getElementById('tlb-rate').textContent = '—';
+}
+
+function renderTLB() {
+  const tbody = document.getElementById('tlb-tbody');
+  let html = '';
+  for (let i = 0; i < 8; i++) {
+    const e = tlb[i];
+    html += e ? `<tr><td>${i}</td><td>${e.page}</td><td>${e.frame}</td><td>✓</td><td>${e.lru}</td></tr>` :
+                `<tr><td>${i}</td><td>—</td><td>—</td><td></td><td></td></tr>`;
+  }
+  tbody.innerHTML = html;
+}
+
+function renderTrace() {
+  const div = document.getElementById('tlb-trace');
+  div.innerHTML = refQueue.map((p, i) => {
+    if (i >= refIdx) return `<span style="color:var(--muted)">${p}</span> `;
+    // look up result
+    return `<span title="ref ${i+1}">${p}</span> `;
+  }).join('');
+}
+
+function tlbLookup(page) {
+  return tlb.findIndex(e => e && e.page === page);
+}
+function tlbLoad(page, frame) {
+  tlbClock++;
+  if (tlb.length < 8) { tlb.push({ page, frame, lru: tlbClock }); return; }
+  // LRU evict
+  let minLru = Infinity, minIdx = 0;
+  for (let i = 0; i < 8; i++) { if (tlb[i] && tlb[i].lru < minLru) { minLru = tlb[i].lru; minIdx = i; } }
+  tlb[minIdx] = { page, frame, lru: tlbClock };
+}
+
+function tlbStep() {
+  if (refIdx >= refQueue.length) { document.getElementById('tlb-current').textContent = 'Reference string complete.'; return; }
+  const pfMap = parsePFMap();
+  const page = refQueue[refIdx++];
+  const idx = tlbLookup(page);
+  let msg = '';
+  if (idx >= 0) {
+    tlbHits++;
+    tlb[idx].lru = ++tlbClock;
+    msg = `<span class="hit">HIT</span> — Page ${page} → Frame ${tlb[idx].frame} (TLB entry ${idx} refreshed)`;
+    // flash row
+    setTimeout(() => {
+      const rows = document.querySelectorAll('#tlb-tbody tr');
+      if (rows[idx]) { rows[idx].classList.add('tlb-hit-row'); setTimeout(() => rows[idx].classList.remove('tlb-hit-row'), 600); }
+    }, 0);
+  } else {
+    tlbMisses++;
+    const frame = pfMap[page] !== undefined ? pfMap[page] : page * 2 + 1;
+    tlbLoad(page, frame);
+    msg = `<span class="miss">MISS</span> — Page ${page} not in TLB. Loaded from page table → Frame ${frame}.`;
+  }
+  document.getElementById('tlb-current').innerHTML = `Ref ${refIdx}: Page <strong>${page}</strong> — ${msg}`;
+  const total = tlbHits + tlbMisses;
+  document.getElementById('tlb-hits').textContent = tlbHits;
+  document.getElementById('tlb-misses').textContent = tlbMisses;
+  document.getElementById('tlb-rate').textContent = (tlbHits / total * 100).toFixed(1) + '%';
+  renderTLB();
+}
+
+function tlbPlay() {
+  if (tlbPlayTimer) { clearInterval(tlbPlayTimer); tlbPlayTimer = null; return; }
+  tlbPlayTimer = setInterval(() => {
+    if (refIdx >= refQueue.length) { clearInterval(tlbPlayTimer); tlbPlayTimer = null; return; }
+    tlbStep();
+  }, 700);
+}
+
+function tlbRandom() {
+  const hot = [3, 7, 4]; const warm = [12, 5, 9]; const cold = [1, 2, 6, 8, 11];
+  let s = [];
+  for (let i = 0; i < 20; i++) {
+    const r = Math.random();
+    if (r < 0.6) s.push(hot[Math.floor(Math.random() * hot.length)]);
+    else if (r < 0.85) s.push(warm[Math.floor(Math.random() * warm.length)]);
+    else s.push(cold[Math.floor(Math.random() * cold.length)]);
+  }
+  document.getElementById('ref-str').value = s.join(' ');
+  tlbReset();
+}
+
+tlbReset();
+
+// ─── EAT CALCULATOR ────────────────────────────────────────────────────────
+function syncAlpha(v) { document.getElementById('alpha-display').textContent = v + '%'; calcEAT(); }
+
+function calcEAT() {
+  const eps = +document.getElementById('e-tlb').value;
+  const t = +document.getElementById('t-mem').value;
+  const alpha = +document.getElementById('alpha-slider').value / 100;
+  const levels = +document.getElementById('pt-levels').value;
+  // miss penalty = levels extra RAM reads for page walk + 1 data read
+  const missPenalty = eps + (levels + 1) * t;
+  const hitPenalty = eps + t;
+  const eat = alpha * hitPenalty + (1 - alpha) * missPenalty;
+  const noTlb = levels * t + t; // all page-table levels + data
+  document.getElementById('eat-formula').innerHTML =
+    `EAT = α × (ε + t) + (1−α) × (ε + ${levels} × t + t)\n` +
+    `    = ${alpha.toFixed(2)} × (${eps}+${t}) + ${(1-alpha).toFixed(2)} × (${eps}+${(levels+1)*t})\n` +
+    `    = ${(alpha*hitPenalty).toFixed(1)} + ${((1-alpha)*missPenalty).toFixed(1)}\n` +
+    `    = ${eat.toFixed(1)} ns`;
+  document.getElementById('eat-val').textContent = eat.toFixed(1);
+  document.getElementById('eat-overhead').textContent = ((eat / t - 1) * 100).toFixed(1) + '%';
+  document.getElementById('no-tlb').textContent = noTlb.toFixed(0);
+  drawEATChart(eps, t, levels);
+}
+
+function drawEATChart(eps, t, levels) {
+  const canvas = document.getElementById('eat-chart');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#162235'; ctx.fillRect(0, 0, W, H);
+
+  const pad = { l: 55, r: 20, t: 15, b: 35 };
+  const gw = W - pad.l - pad.r, gh = H - pad.t - pad.b;
+  const noTlb = (levels + 1) * t;
+  const minY = t, maxY = noTlb * 1.05;
+
+  ctx.strokeStyle = '#2d4a6a'; ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++) {
+    const y = pad.t + gh * i / 5;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+    const val = maxY - (maxY - minY) * i / 5;
+    ctx.fillStyle = '#94a3b8'; ctx.font = '11px Segoe UI'; ctx.textAlign = 'right';
+    ctx.fillText(val.toFixed(0) + ' ns', pad.l - 4, y + 4);
+  }
+
+  // line: EAT vs alpha
+  ctx.beginPath(); ctx.strokeStyle = '#ff8c00'; ctx.lineWidth = 2;
+  for (let i = 0; i <= 100; i++) {
+    const a = i / 100;
+    const eat = a * (eps + t) + (1 - a) * (eps + (levels + 1) * t);
+    const x = pad.l + gw * i / 100;
+    const y = pad.t + gh * (1 - (eat - minY) / (maxY - minY));
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // ideal line
+  ctx.beginPath(); ctx.strokeStyle = '#06b6d4'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+  ctx.moveTo(pad.l, pad.t + gh * (1 - (t - minY) / (maxY - minY)));
+  ctx.lineTo(W - pad.r, pad.t + gh * (1 - (t - minY) / (maxY - minY)));
+  ctx.stroke(); ctx.setLineDash([]);
+
+  // axes
+  ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, pad.t + gh); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(pad.l, pad.t + gh); ctx.lineTo(W - pad.r, pad.t + gh); ctx.stroke();
+
+  ctx.fillStyle = '#94a3b8'; ctx.font = '11px Segoe UI'; ctx.textAlign = 'center';
+  ctx.fillText('TLB Hit Ratio α (0% → 100%)', pad.l + gw / 2, H - 6);
+  ctx.fillStyle = '#06b6d4'; ctx.font = '10px Segoe UI'; ctx.textAlign = 'left';
+  ctx.fillText('── ideal (t=' + t + 'ns)', pad.l + 4, pad.t + gh * (1 - (t - minY) / (maxY - minY)) - 4);
+}
+
+// ─── OVERHEAD CALCULATOR ───────────────────────────────────────────────────
+function calcOverhead() {
+  const vaBits = +document.getElementById('va-bits-ov').value;
+  const pgBytes = +document.getElementById('pg-bytes-ov').value;
+  const pteSize = +document.getElementById('pte-bytes-ov').value;
+  const offBits = Math.log2(pgBytes);
+  const pgBits = vaBits - offBits;
+  const numPages = Math.pow(2, pgBits);
+  const singleLevelBytes = numPages * pteSize;
+  const half = pgBits / 2;
+  const dirEntries = Math.pow(2, Math.ceil(half));
+  const ptEntries = Math.pow(2, Math.floor(half));
+  const twoLevelMin = (dirEntries + ptEntries) * pteSize; // 1 dir + 1 PT (best case)
+  const format = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : b >= 1024 ? (b / 1024).toFixed(1) + ' KB' : b + ' B';
+  document.getElementById('overhead-result').innerHTML = `
+    <table class="overhead-table">
+      <thead><tr><th>Structure</th><th>Entries</th><th>Size</th></tr></thead>
+      <tbody>
+        <tr><td>Single-level page table</td><td>${numPages.toLocaleString()}</td><td><strong>${format(singleLevelBytes)}</strong></td></tr>
+        <tr><td>Two-level directory</td><td>${dirEntries.toLocaleString()}</td><td>${format(dirEntries * pteSize)}</td></tr>
+        <tr><td>Two-level PT (1 table, best case)</td><td>${ptEntries.toLocaleString()}</td><td>${format(ptEntries * pteSize)}</td></tr>
+        <tr><td><strong>Two-level min total</strong></td><td>—</td><td><strong>${format(twoLevelMin)}</strong> (sparse process)</td></tr>
+      </tbody>
+    </table>
+    <div style="margin-top:8px;font-size:0.82rem;color:var(--muted)">
+      Savings for sparse space: ${Math.round(singleLevelBytes / twoLevelMin)}× — grows larger for higher-level hierarchies.
+    </div>`;
+}
+
+calcEAT(); calcOverhead();
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+import{E as e,R as t,X as n,_ as r,_t as i,g as a,ht as o,v as s,x as c}from"./modules/shiki-Dm5aQrj-.js";import{et as l,tt as u}from"./index-C9IEqIwX.js";import{t as d}from"./default-Rl1U7Xc0.js";``+new URL(`tlb_diagram-DN9h-tyB.png`,import.meta.url).href;var f={__name:`L10_1_Paging_and_Page_Tables.md__slidev_7`,setup(f){let{$slidev:p,$nav:m,$clicksContext:h,$clicks:g,$page:_,$renderContext:v,$frontmatter:y}=u();return h.setup(),(u,f)=>(t(),r(d,i(e(o(l)(o(y),6))),{default:n(()=>[f[0]||=a(`h1`,null,`TLB — Translation Lookaside Buffer`,-1),f[1]||=a(`p`,null,[c(`Every memory access requires a `),a(`strong`,null,`page table lookup`),c(` (itself a memory access) → doubles memory access time.`)],-1),f[2]||=a(`p`,null,[a(`strong`,null,`Solution:`),c(` hardware cache for frequently used PTEs.`)],-1),s(`nanobanana:
+Technical textbook-style diagram on a dark (#1a1a2e) background.
+White labels, orange (#ff8c00) accent lines, blue (#4a90d9) boxes.
+Flat design, clean sans-serif font, no gradients.
+Three vertical sections left to right: CPU, TLB (centre), RAM.
+CPU box on left with label "VA: page p, offset d".
+Centre box labelled "TLB (associative cache)" — a small table with columns "page" and "frame": rows p=3 frame=7, p=7 frame=2, p=12 frame=15.
+Two paths from TLB:
+  Path 1 (HIT, green arrow): TLB → physical address label "hit: 1 memory access".
+  Path 2 (MISS, red arrow down): TLB → RAM page table → load into TLB → physical address label "miss: 2 memory accesses".
+Style: CS course slide illustration, 1200×480 px, PNG.
+Save output as: Lectures/Week_10_Paging_and_Virtual_Memory/assets/tlb_diagram.png
+`),f[3]||=a(`img`,{src:``+new URL(`tlb_diagram-DN9h-tyB.png`,import.meta.url).href,alt:`TLB hit and miss paths`,class:`mx-auto h-48`},null,-1),f[4]||=a(`p`,{class:`text-center text-xs italic text-gray-400 mt-1`},`Diagram generated with AI image generation (nanobanana). Illustrative only.`,-1),f[5]||=a(`p`,null,[a(`strong`,null,`Key properties:`)],-1),f[6]||=a(`ul`,null,[a(`li`,null,[a(`strong`,null,`Associative lookup:`),c(` searched in parallel (all entries at once)`)]),a(`li`,null,[a(`strong`,null,`TLB size:`),c(` typically 64–4096 entries (L1 TLB: 64; L2 TLB: 1024–4096)`)]),a(`li`,null,[a(`strong`,null,`TLB miss penalty:`),c(` 1–4 extra memory accesses for page-table walk`)]),a(`li`,null,[a(`strong`,null,`TLB flush:`),c(` on context switch (process change) — costly! Mitigated by Address Space Identifiers (ASIDs)`)])],-1)]),_:1},16))}};export{f as default};
