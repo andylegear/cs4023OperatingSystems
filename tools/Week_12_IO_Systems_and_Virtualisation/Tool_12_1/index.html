@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tool 12.1 — Disk Scheduler | CS4023 Operating Systems</title>
+<style>
+  :root {
+    --bg: #0f1929; --navy: #1a2740; --navy2: #1e2e4a; --accent: #ff8c00;
+    --green: #4caf50; --red: #f44336; --border: #2c3e5f; --muted: #7a8fa8;
+    --text: #e0e8f0; --served: #445566;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; font-size: 14px; }
+  header { background: var(--navy); padding: 14px 20px; border-bottom: 2px solid var(--accent); }
+  header h1 { font-size: 1.1rem; color: var(--accent); }
+  header p { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+  .tabs { display: flex; gap: 2px; background: var(--navy); padding: 0 16px; border-bottom: 1px solid var(--border); }
+  .tab { padding: 10px 18px; cursor: pointer; font-size: 0.85rem; color: var(--muted); border-bottom: 3px solid transparent; }
+  .tab.active { color: var(--accent); border-color: var(--accent); }
+  .panel { display: none; padding: 16px; }
+  .panel.active { display: block; }
+  .info-box { background: var(--navy2); border-left: 3px solid var(--accent); padding: 10px 14px; border-radius: 0 6px 6px 0; font-size: 0.82rem; line-height: 1.6; margin-bottom: 16px; }
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+  label { font-size: 0.82rem; color: var(--muted); }
+  input[type="text"], input[type="number"] { background: var(--navy2); border: 1px solid var(--border); color: var(--text); padding: 5px 8px; border-radius: 4px; font-size: 0.82rem; }
+  input[type="range"] { accent-color: var(--accent); width: 120px; }
+  select { background: var(--navy2); border: 1px solid var(--border); color: var(--text); padding: 5px 8px; border-radius: 4px; font-size: 0.82rem; }
+  button { background: var(--accent); color: #000; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.82rem; font-weight: 600; }
+  button:hover { opacity: 0.85; }
+  button.secondary { background: var(--navy2); color: var(--text); border: 1px solid var(--border); }
+  button.secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .sim-area { display: flex; gap: 16px; align-items: flex-start; }
+  .track-wrap { display: flex; flex-direction: column; align-items: center; }
+  .track-wrap h4 { font-size: 0.8rem; color: var(--accent); margin-bottom: 6px; text-align: center; }
+  .track-container { position: relative; width: 48px; height: 400px; background: var(--navy2); border: 1px solid var(--border); border-radius: 4px; }
+  .track-scale { position: absolute; right: 52px; top: 0; height: 100%; display: flex; flex-direction: column; justify-content: space-between; }
+  .scale-label { font-size: 0.65rem; color: var(--muted); text-align: right; }
+  .req-dot { position: absolute; width: 10px; height: 10px; border-radius: 50%; left: 19px; transform: translateX(-50%); transition: background 0.3s; }
+  .head-marker { position: absolute; width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 16px solid var(--accent); left: 4px; transition: top 0.4s ease; margin-top: -8px; }
+  .trail-line { position: absolute; width: 2px; background: rgba(255,140,0,0.3); left: 23px; }
+  .stats { flex: 1; min-width: 260px; }
+  .stat-card { background: var(--navy2); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; margin-bottom: 10px; }
+  .stat-card h4 { font-size: 0.85rem; color: var(--accent); margin-bottom: 6px; }
+  .stat-row { display: flex; justify-content: space-between; font-size: 0.8rem; padding: 2px 0; border-bottom: 1px solid var(--border); }
+  .stat-row:last-child { border: none; }
+  .movement-count { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
+  .order-list { font-size: 0.78rem; color: var(--muted); word-break: break-all; }
+  .comparison-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; margin-top: 8px; }
+  .comparison-table th { background: var(--navy); padding: 6px 8px; text-align: left; color: var(--accent); border: 1px solid var(--border); }
+  .comparison-table td { padding: 5px 8px; border: 1px solid var(--border); }
+  .comparison-table tr:nth-child(even) td { background: var(--navy2); }
+  .best { color: var(--green); font-weight: 700; }
+  .worst { color: var(--red); }
+  .algo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .algo-track-wrap { background: var(--navy2); border: 1px solid var(--border); border-radius: 6px; padding: 10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Tool 12.1 — Disk Scheduler</h1>
+  <p>CS4023 Operating Systems &nbsp;|&nbsp; Week 12: I/O Systems</p>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('single')">Step-by-Step</div>
+  <div class="tab" onclick="switchTab('compare')">Algorithm Race</div>
+  <div class="tab" onclick="switchTab('custom')">Custom Input</div>
+</div>
+
+<!-- TAB 1: Step-by-step -->
+<div id="tab-single" class="panel active">
+  <div class="info-box">
+    <strong>What is disk scheduling?</strong> A Hard Disk Drive (HDD) has a moving read/write head that must seek to the correct cylinder before reading data. Seek time dominates HDD latency (~2–15 ms). When multiple I/O requests are pending, the OS reorders them to minimise total head movement — this is disk scheduling.<br>
+    <strong>How to use this panel:</strong> Choose an algorithm, set the head start position, and click <strong>Animate</strong>. Use <strong>Step →</strong> to advance one request at a time and observe the head marker moving. The movement counter shows cumulative cylinders travelled. The service order and algorithm notes appear on the right.
+  </div>
+  <div class="controls">
+    <label>Algorithm:</label>
+    <select id="s-algo">
+      <option value="fcfs">FCFS (First Come, First Served)</option>
+      <option value="sstf">SSTF (Shortest Seek Time First)</option>
+      <option value="scan" selected>SCAN (Elevator)</option>
+      <option value="cscan">C-SCAN (Circular SCAN)</option>
+      <option value="look">LOOK</option>
+      <option value="clook">C-LOOK</option>
+    </select>
+    <label>Head start:</label>
+    <input type="number" id="s-head" value="50" min="0" max="199" style="width:60px">
+    <label>Direction:</label>
+    <select id="s-dir">
+      <option value="up">Toward higher</option>
+      <option value="down">Toward lower</option>
+    </select>
+    <label>Speed:</label>
+    <input type="range" id="s-speed" min="100" max="800" value="400" step="50">
+    <button onclick="singleStart()">▶ Animate</button>
+    <button class="secondary" onclick="singleStep()">Step →</button>
+    <button class="secondary" onclick="singleReset()">↺ Reset</button>
+  </div>
+  <div class="controls">
+    <label>Requests (cylinders):</label>
+    <input type="text" id="s-reqs" value="82, 170, 43, 140, 24, 16, 190" style="width:260px">
+  </div>
+  <div class="sim-area">
+    <div class="track-wrap" style="position:relative; margin-top: 20px;">
+      <h4 id="s-algo-label">SCAN</h4>
+      <div style="display:flex; align-items:flex-start;">
+        <div style="display:flex; flex-direction:column; justify-content:space-between; height:400px; margin-right:4px; padding: 5px 0;">
+          <span class="scale-label">0</span>
+          <span class="scale-label">50</span>
+          <span class="scale-label">100</span>
+          <span class="scale-label">150</span>
+          <span class="scale-label">199</span>
+        </div>
+        <div class="track-container" id="s-track"></div>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat-card">
+        <h4>Head Movement</h4>
+        <div class="movement-count" id="s-movement">0</div>
+        <div style="font-size:0.75rem; color:var(--muted); margin-top:4px;">cylinders travelled</div>
+      </div>
+      <div class="stat-card">
+        <h4>Service Order</h4>
+        <div class="order-list" id="s-order">—</div>
+      </div>
+      <div class="stat-card">
+        <h4>Algorithm Notes</h4>
+        <div id="s-notes" style="font-size:0.78rem; line-height:1.5; color:var(--muted);">Select an algorithm and click Animate.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 2: Algorithm Race -->
+<div id="tab-compare" class="panel">
+  <div class="info-box">
+    <strong>Algorithm Race:</strong> All four main disk scheduling algorithms run simultaneously on the same request queue. Compare total head movement side-by-side. The algorithm with the fewest cylinders is highlighted green; the worst is red.<br>
+    FCFS serves requests in arrival order. SSTF always picks the closest. SCAN sweeps in one direction then reverses. C-SCAN sweeps outward only and wraps back to 0.
+  </div>
+  <div class="controls">
+    <label>Head start:</label>
+    <input type="number" id="c-head" value="50" min="0" max="199" style="width:60px">
+    <label>Requests:</label>
+    <input type="text" id="c-reqs" value="82, 170, 43, 140, 24, 16, 190" style="width:260px">
+    <button onclick="compareRun()">▶ Run All</button>
+    <button class="secondary" onclick="compareReset()">↺ Reset</button>
+  </div>
+  <div id="compare-results" style="display:none; margin-top:8px;">
+    <table class="comparison-table" id="compare-table"></table>
+    <div id="compare-note" style="margin-top: 10px; font-size:0.8rem; color:var(--muted);"></div>
+  </div>
+  <div class="algo-grid" id="algo-grid" style="margin-top: 12px;"></div>
+</div>
+
+<!-- TAB 3: Custom Input -->
+<div id="tab-custom" class="panel">
+  <div class="info-box">
+    <strong>Custom experiment:</strong> Enter your own request queue and head position. Choose any algorithm and track size. Use this to verify your worked examples from the lecture or try Belady-style starvation scenarios.<br>
+    <strong>Starvation demo:</strong> Try SSTF with requests <code>5, 6, 7, 8, 190</code> and head=5. Does cylinder 190 ever get served?
+  </div>
+  <div class="controls" style="flex-direction: column; align-items: flex-start; gap:8px;">
+    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+      <label>Requests (comma-separated):</label>
+      <input type="text" id="cu-reqs" value="55, 200, 35, 180, 90, 150, 10" style="width:280px">
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+      <label>Head start:</label>
+      <input type="number" id="cu-head" value="100" min="0" style="width:70px">
+      <label>Max cylinder:</label>
+      <input type="number" id="cu-max" value="249" min="10" style="width:70px">
+      <label>Algorithm:</label>
+      <select id="cu-algo">
+        <option value="fcfs">FCFS</option>
+        <option value="sstf">SSTF</option>
+        <option value="scan">SCAN</option>
+        <option value="cscan">C-SCAN</option>
+        <option value="look">LOOK</option>
+        <option value="clook">C-LOOK</option>
+      </select>
+      <label>Direction:</label>
+      <select id="cu-dir">
+        <option value="up">Toward higher</option>
+        <option value="down">Toward lower</option>
+      </select>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button onclick="customRun()">Calculate</button>
+      <button class="secondary" onclick="customAll()">Run All Algorithms</button>
+    </div>
+  </div>
+  <div id="cu-result" style="margin-top:12px;"></div>
+</div>
+
+<script>
+const ALGO_NOTES = {
+  fcfs: 'FCFS serves requests in arrival order. Simple but can result in large total head movement (\"disk thrashing\"). No starvation risk — every request is eventually served.',
+  sstf: 'SSTF always picks the request closest to the current head position. Minimises average seek time but can cause starvation: requests far from the head may never be served if closer requests keep arriving.',
+  scan: 'SCAN (Elevator) sweeps in one direction, serves all requests in that direction, then reverses at the disk end (cylinder 0 or max). Fair — no starvation. May travel to cylinder 0 even if no requests there.',
+  cscan: 'C-SCAN sweeps outward (toward higher cylinders only), serves all requests, then returns directly to cylinder 0 and sweeps again. More uniform wait time than SCAN — requests near 0 are not starved after a long outward sweep.',
+  look: 'LOOK is like SCAN but only travels as far as the last request in each direction (does not go to disk boundaries unnecessarily). Saves travel to cylinder 0/max when no requests there.',
+  clook: 'C-LOOK is like C-SCAN but only travels to the furthest request (not disk boundary) before wrapping. More efficient than C-SCAN for sparsely distributed requests.'
+};
+
+// ─── Scheduling Algorithms ───────────────────────────────────────────────────
+
+function parseReqs(str) {
+  return str.split(/[,\s]+/).map(Number).filter(n => !isNaN(n) && n >= 0);
+}
+
+function schedFCFS(head, reqs) {
+  let order = [...reqs], pos = head, total = 0;
+  for (const r of order) { total += Math.abs(r - pos); pos = r; }
+  return { order, total };
+}
+
+function schedSSTF(head, reqs) {
+  let remaining = [...reqs], pos = head, total = 0, order = [];
+  while (remaining.length) {
+    let idx = 0, minDist = Infinity;
+    for (let i = 0; i < remaining.length; i++) {
+      const d = Math.abs(remaining[i] - pos);
+      if (d < minDist) { minDist = d; idx = i; }
+    }
+    total += minDist; pos = remaining[idx];
+    order.push(pos); remaining.splice(idx, 1);
+  }
+  return { order, total };
+}
+
+function schedSCAN(head, reqs, dir, maxCyl) {
+  let sorted = [...reqs].sort((a,b) => a-b);
+  let above = sorted.filter(r => r >= head).sort((a,b)=>a-b);
+  let below = sorted.filter(r => r < head).sort((a,b)=>b-a);
+  let order = [], total = 0, pos = head;
+  if (dir === 'up') {
+    for (const r of above) { total += Math.abs(r-pos); pos = r; order.push(r); }
+    if (above.length) total += Math.abs(maxCyl - pos), pos = maxCyl;
+    for (const r of below) { total += Math.abs(r-pos); pos = r; order.push(r); }
+  } else {
+    for (const r of below) { total += Math.abs(r-pos); pos = r; order.push(r); }
+    if (below.length) total += pos, pos = 0;
+    for (const r of above) { total += Math.abs(r-pos); pos = r; order.push(r); }
+  }
+  return { order, total };
+}
+
+function schedCSCAN(head, reqs, maxCyl) {
+  let sorted = [...reqs].sort((a,b) => a-b);
+  let above = sorted.filter(r => r >= head);
+  let below = sorted.filter(r => r < head);
+  let order = [], total = 0, pos = head;
+  for (const r of above) { total += Math.abs(r-pos); pos = r; order.push(r); }
+  if (above.length) { total += (maxCyl - pos) + maxCyl; pos = 0; }
+  for (const r of below) { total += Math.abs(r-pos); pos = r; order.push(r); }
+  return { order, total };
+}
+
+function schedLOOK(head, reqs, dir) {
+  let sorted = [...reqs].sort((a,b) => a-b);
+  let above = sorted.filter(r => r >= head);
+  let below = sorted.filter(r => r < head).sort((a,b)=>b-a);
+  let order = [], total = 0, pos = head;
+  if (dir === 'up') {
+    for (const r of above) { total += Math.abs(r-pos); pos = r; order.push(r); }
+    for (const r of below) { total += Math.abs(r-pos); pos = r; order.push(r); }
+  } else {
+    for (const r of below) { total += Math.abs(r-pos); pos = r; order.push(r); }
+    for (const r of above) { total += Math.abs(r-pos); pos = r; order.push(r); }
+  }
+  return { order, total };
+}
+
+function schedCLOOK(head, reqs) {
+  let sorted = [...reqs].sort((a,b) => a-b);
+  let above = sorted.filter(r => r >= head);
+  let below = sorted.filter(r => r < head);
+  let order = [], total = 0, pos = head;
+  for (const r of above) { total += Math.abs(r-pos); pos = r; order.push(r); }
+  if (above.length && below.length) { total += Math.abs(pos - below[0]); pos = below[0]; order.push(below[0]); below.shift(); }
+  for (const r of below) { total += Math.abs(r-pos); pos = r; order.push(r); }
+  return { order, total };
+}
+
+function runAlgo(algoId, head, reqs, dir, maxCyl) {
+  switch(algoId) {
+    case 'fcfs': return schedFCFS(head, reqs);
+    case 'sstf': return schedSSTF(head, reqs);
+    case 'scan': return schedSCAN(head, reqs, dir, maxCyl);
+    case 'cscan': return schedCSCAN(head, reqs, maxCyl);
+    case 'look': return schedLOOK(head, reqs, dir);
+    case 'clook': return schedCLOOK(head, reqs);
+  }
+}
+
+// ─── Track Rendering ─────────────────────────────────────────────────────────
+
+function buildTrack(containerId, head, reqs, maxCyl) {
+  const c = document.getElementById(containerId);
+  c.innerHTML = '';
+  const h = c.offsetHeight || 400;
+  const colors = ['#4dd0e1','#81c784','#ffb74d','#f06292','#ce93d8','#80cbc4','#a5d6a7'];
+  reqs.forEach((r, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'req-dot';
+    dot.style.top = (r / maxCyl * h - 5) + 'px';
+    dot.style.background = colors[i % colors.length];
+    dot.dataset.cyl = r;
+    dot.title = 'Cylinder ' + r;
+    c.appendChild(dot);
+  });
+  const marker = document.createElement('div');
+  marker.className = 'head-marker';
+  marker.id = containerId + '-head';
+  marker.style.top = (head / maxCyl * h) + 'px';
+  c.appendChild(marker);
+  return { marker, dots: c.querySelectorAll('.req-dot') };
+}
+
+function moveHead(marker, pos, maxCyl, h) {
+  marker.style.top = (pos / maxCyl * h) + 'px';
+}
+
+// ─── Tab 1: Single Algorithm ──────────────────────────────────────────────────
+
+let sState = null;
+
+function singleReset() {
+  sState = null;
+  document.getElementById('s-movement').textContent = '0';
+  document.getElementById('s-order').textContent = '—';
+  document.getElementById('s-notes').textContent = 'Select an algorithm and click Animate.';
+  const head = parseInt(document.getElementById('s-head').value);
+  const reqs = parseReqs(document.getElementById('s-reqs').value);
+  const algoId = document.getElementById('s-algo').value;
+  document.getElementById('s-algo-label').textContent = algoId.toUpperCase();
+  buildTrack('s-track', head, reqs, 199);
+}
+
+function singlePrepare() {
+  const head = parseInt(document.getElementById('s-head').value);
+  const reqs = parseReqs(document.getElementById('s-reqs').value);
+  const algoId = document.getElementById('s-algo').value;
+  const dir = document.getElementById('s-dir').value;
+  const result = runAlgo(algoId, head, reqs, dir, 199);
+  const { marker } = buildTrack('s-track', head, reqs, 199);
+  sState = { steps: result.order, stepIdx: 0, pos: head, total: 0, marker, result, algoId };
+  document.getElementById('s-algo-label').textContent = algoId.toUpperCase();
+  document.getElementById('s-notes').innerHTML = ALGO_NOTES[algoId];
+}
+
+function singleStep() {
+  if (!sState) singlePrepare();
+  if (sState.stepIdx >= sState.steps.length) return;
+  const target = sState.steps[sState.stepIdx];
+  sState.total += Math.abs(target - sState.pos);
+  sState.pos = target;
+  const h = 400;
+  moveHead(sState.marker, target, 199, h);
+  const dots = document.querySelectorAll('#s-track .req-dot');
+  dots.forEach(d => { if (parseInt(d.dataset.cyl) === target) d.style.background = 'var(--served)'; });
+  sState.stepIdx++;
+  document.getElementById('s-movement').textContent = sState.total;
+  document.getElementById('s-order').textContent = sState.steps.slice(0, sState.stepIdx).join(' → ');
+}
+
+let sInterval = null;
+function singleStart() {
+  if (sInterval) { clearInterval(sInterval); sInterval = null; return; }
+  if (!sState || sState.stepIdx > 0) singlePrepare();
+  const speed = parseInt(document.getElementById('s-speed').value);
+  sInterval = setInterval(() => {
+    if (sState.stepIdx >= sState.steps.length) { clearInterval(sInterval); sInterval = null; return; }
+    singleStep();
+  }, speed);
+}
+
+// ─── Tab 2: Compare ───────────────────────────────────────────────────────────
+
+function compareReset() {
+  document.getElementById('compare-results').style.display = 'none';
+  document.getElementById('algo-grid').innerHTML = '';
+}
+
+function compareRun() {
+  const head = parseInt(document.getElementById('c-head').value);
+  const reqs = parseReqs(document.getElementById('c-reqs').value);
+  const algos = ['fcfs','sstf','scan','cscan'];
+  const algoNames = { fcfs:'FCFS', sstf:'SSTF', scan:'SCAN', cscan:'C-SCAN' };
+  const results = algos.map(a => ({ id: a, name: algoNames[a], ...runAlgo(a, head, reqs, 'up', 199) }));
+  results.sort((a,b) => a.total - b.total);
+  const best = results[0].total, worst = results[results.length-1].total;
+
+  let html = '<thead><tr><th>Algorithm</th><th>Service Order</th><th>Total Movement</th><th>Starvation Risk</th></tr></thead><tbody>';
+  results.forEach(r => {
+    const cls = r.total === best ? 'best' : r.total === worst ? 'worst' : '';
+    const starv = r.id === 'sstf' ? 'Yes (distant reqs)' : 'No';
+    html += `<tr><td>${r.name}</td><td style="font-size:0.72rem">${head} → ${r.order.join(' → ')}</td><td class="${cls}">${r.total}</td><td>${starv}</td></tr>`;
+  });
+  html += '</tbody>';
+  document.getElementById('compare-table').innerHTML = html;
+  document.getElementById('compare-results').style.display = 'block';
+  document.getElementById('compare-note').innerHTML =
+    `<strong>Best:</strong> ${results[0].name} (${results[0].total} cylinders) &nbsp;|&nbsp; ` +
+    `<strong>Worst:</strong> ${results[results.length-1].name} (${results[results.length-1].total} cylinders). ` +
+    `SSTF minimises average seek but risks starvation. SCAN/C-SCAN are fairer.`;
+
+  const grid = document.getElementById('algo-grid');
+  grid.innerHTML = '';
+  algos.forEach(a => {
+    const r = results.find(x => x.id === a);
+    const wrap = document.createElement('div');
+    wrap.className = 'algo-track-wrap';
+    wrap.innerHTML = `<h4>${algoNames[a]}: ${r.total} cylinders</h4>
+      <div style="font-size:0.72rem; color:var(--muted); margin-top:2px;">${head} → ${r.order.join(' → ')}</div>`;
+    grid.appendChild(wrap);
+  });
+}
+
+// ─── Tab 3: Custom ────────────────────────────────────────────────────────────
+
+function customRun() {
+  const head = parseInt(document.getElementById('cu-head').value);
+  const reqs = parseReqs(document.getElementById('cu-reqs').value);
+  const algoId = document.getElementById('cu-algo').value;
+  const dir = document.getElementById('cu-dir').value;
+  const maxCyl = parseInt(document.getElementById('cu-max').value);
+  const result = runAlgo(algoId, head, reqs, dir, maxCyl);
+  document.getElementById('cu-result').innerHTML = `
+    <div class="stat-card">
+      <h4>${algoId.toUpperCase()}</h4>
+      <div style="margin:6px 0;"><span class="movement-count">${result.total}</span> <span style="font-size:0.8rem;color:var(--muted)">cylinders</span></div>
+      <div style="font-size:0.78rem;">Service order: ${head} → ${result.order.join(' → ')}</div>
+      <div style="font-size:0.76rem; color:var(--muted); margin-top:6px;">${ALGO_NOTES[algoId]}</div>
+    </div>`;
+}
+
+function customAll() {
+  const head = parseInt(document.getElementById('cu-head').value);
+  const reqs = parseReqs(document.getElementById('cu-reqs').value);
+  const dir = document.getElementById('cu-dir').value;
+  const maxCyl = parseInt(document.getElementById('cu-max').value);
+  const algos = ['fcfs','sstf','scan','cscan','look','clook'];
+  const names = { fcfs:'FCFS', sstf:'SSTF', scan:'SCAN', cscan:'C-SCAN', look:'LOOK', clook:'C-LOOK' };
+  const results = algos.map(a => ({ id:a, name:names[a], ...runAlgo(a, head, reqs, dir, maxCyl) }));
+  results.sort((a,b) => a.total - b.total);
+  const best = results[0].total;
+  let html = '<table class="comparison-table"><thead><tr><th>Algorithm</th><th>Total</th><th>Service Order</th></tr></thead><tbody>';
+  results.forEach(r => {
+    html += `<tr><td>${r.name}</td><td class="${r.total === best ? 'best' : ''}">${r.total}</td><td style="font-size:0.72rem">${head} → ${r.order.join(' → ')}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('cu-result').innerHTML = html;
+}
+
+// ─── Tab switching ────────────────────────────────────────────────────────────
+
+function switchTab(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    if (['single','compare','custom'][i] === id) t.classList.add('active');
+  });
+}
+
+// Init
+window.addEventListener('load', () => { singleReset(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tool 12.2 — Container vs VM Builder | CS4023 Operating Systems</title>
+<style>
+  :root {
+    --bg: #0f1929; --navy: #1a2740; --navy2: #1e2e4a; --accent: #ff8c00;
+    --green: #4caf50; --red: #f44336; --yellow: #ffd54f; --border: #2c3e5f;
+    --muted: #7a8fa8; --text: #e0e8f0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; font-size: 14px; }
+  header { background: var(--navy); padding: 14px 20px; border-bottom: 2px solid var(--accent); }
+  header h1 { font-size: 1.1rem; color: var(--accent); }
+  header p { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+  .tabs { display: flex; gap: 2px; background: var(--navy); padding: 0 16px; border-bottom: 1px solid var(--border); }
+  .tab { padding: 10px 18px; cursor: pointer; font-size: 0.85rem; color: var(--muted); border-bottom: 3px solid transparent; }
+  .tab.active { color: var(--accent); border-color: var(--accent); }
+  .panel { display: none; padding: 16px; }
+  .panel.active { display: block; }
+  .info-box { background: var(--navy2); border-left: 3px solid var(--accent); padding: 10px 14px; border-radius: 0 6px 6px 0; font-size: 0.82rem; line-height: 1.6; margin-bottom: 16px; }
+  button { background: var(--accent); color: #000; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.82rem; font-weight: 600; }
+  button:hover { opacity: 0.85; }
+  button.secondary { background: var(--navy2); color: var(--text); border: 1px solid var(--border); }
+  button.secondary:hover { border-color: var(--accent); color: var(--accent); }
+  /* Stack Builder */
+  .stacks-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .stack-col { background: var(--navy2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+  .stack-col h3 { color: var(--accent); font-size: 0.9rem; margin-bottom: 8px; text-align: center; }
+  .drop-zone { min-height: 52px; background: rgba(255,140,0,0.05); border: 1px dashed var(--border); border-radius: 4px; margin: 4px 0; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; color: var(--muted); transition: border-color 0.2s; }
+  .drop-zone.over { border-color: var(--accent); background: rgba(255,140,0,0.1); }
+  .drop-zone.correct { border-color: var(--green); background: rgba(76,175,80,0.15); }
+  .drop-zone.wrong { border-color: var(--red); background: rgba(244,67,54,0.15); }
+  .slot-label { font-size: 0.68rem; color: var(--muted); margin-bottom: 2px; text-align: center; }
+  .tile-bank { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; background: var(--navy); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 14px; }
+  .tile { padding: 7px 12px; border-radius: 4px; cursor: grab; font-size: 0.8rem; font-weight: 600; user-select: none; border: 1px solid transparent; }
+  .tile:active { cursor: grabbing; opacity: 0.8; }
+  .tile.used { opacity: 0.35; cursor: not-allowed; }
+  /* Namespace Matcher */
+  .matcher-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .matcher-col { display: flex; flex-direction: column; gap: 6px; }
+  .match-item { padding: 8px 12px; border-radius: 4px; font-size: 0.8rem; cursor: pointer; border: 2px solid var(--border); }
+  .match-item.selected { border-color: var(--accent); background: rgba(255,140,0,0.1); }
+  .match-item.matched { border-color: var(--green); background: rgba(76,175,80,0.12); cursor: default; }
+  .match-item.wrong-match { border-color: var(--red); background: rgba(244,67,54,0.12); }
+  /* Classifier */
+  .scenarios { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .scenario-card { background: var(--navy2); border: 1px solid var(--border); border-radius: 6px; padding: 10px; }
+  .scenario-card p { font-size: 0.8rem; margin-bottom: 8px; }
+  .classify-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .classify-btns button { font-size: 0.75rem; padding: 4px 10px; }
+  .scenario-card.correct { border-color: var(--green); }
+  .scenario-card.wrong { border-color: var(--red); }
+  .feedback { font-size: 0.75rem; margin-top: 4px; min-height: 14px; }
+  /* Comparison table */
+  .cmp-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; margin-top: 10px; }
+  .cmp-table th { background: var(--navy); padding: 6px 8px; text-align: left; color: var(--accent); border: 1px solid var(--border); }
+  .cmp-table td { padding: 5px 8px; border: 1px solid var(--border); }
+  .cmp-table tr:nth-child(even) td { background: var(--navy2); }
+  .score { font-size: 1.2rem; font-weight: 700; color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Tool 12.2 — Container vs VM Builder</h1>
+  <p>CS4023 Operating Systems &nbsp;|&nbsp; Week 12: Virtualisation and Containers</p>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('stack')">Stack Builder</div>
+  <div class="tab" onclick="switchTab('ns')">Namespace Matcher</div>
+  <div class="tab" onclick="switchTab('classify')">Workload Classifier</div>
+</div>
+
+<!-- TAB 1: Stack Builder -->
+<div id="tab-stack" class="panel active">
+  <div class="info-box">
+    <strong>What is the software stack?</strong> Every computing environment — bare-metal, VM, or container — can be described as a vertical stack of software layers, each depending on the one below. Understanding which layer exists (or is absent) in each model is the key to understanding isolation, overhead, and flexibility.<br>
+    <strong>How to use this panel:</strong> Drag layer tiles from the bank into the correct numbered slots for each stack. Slot 1 = bottom (hardware); Slot 4 = top (application). When you're done, click <strong>Check</strong> to validate. Click <strong>Show Comparison</strong> to see the property table.
+  </div>
+  <div class="tile-bank" id="tile-bank"></div>
+  <div style="display:flex; gap:8px; margin-bottom:12px;">
+    <button onclick="stackCheck()">✓ Check Stacks</button>
+    <button class="secondary" onclick="stackReset()">↺ Reset</button>
+    <button class="secondary" onclick="stackShowComparison()">Show Comparison Table</button>
+  </div>
+  <div class="stacks-grid" id="stacks-grid"></div>
+  <div id="stack-compare" style="display:none; margin-top:14px;"></div>
+</div>
+
+<!-- TAB 2: Namespace Matcher -->
+<div id="tab-ns" class="panel">
+  <div class="info-box">
+    <strong>What are Linux namespaces?</strong> A namespace wraps a global OS resource so that each process inside a namespace sees its own isolated instance. Containers get a private set of namespaces — they think they own the machine, but they only own their namespace view.<br>
+    <strong>How to use this panel:</strong> Click a namespace name on the left, then click the matching description on the right. Correct matches turn green. Try all 7!
+  </div>
+  <div style="display:flex; gap:10px; margin-bottom:10px; align-items:center;">
+    <div class="score" id="ns-score">0 / 7</div>
+    <button class="secondary" onclick="nsReset()">↺ Reset</button>
+  </div>
+  <div class="matcher-grid">
+    <div class="matcher-col" id="ns-left"></div>
+    <div class="matcher-col" id="ns-right"></div>
+  </div>
+  <div id="ns-note" style="margin-top:12px; font-size:0.8rem; color:var(--muted);"></div>
+</div>
+
+<!-- TAB 3: Workload Classifier -->
+<div id="tab-classify" class="panel">
+  <div class="info-box">
+    <strong>VM or Container?</strong> The right choice depends on isolation requirements, startup time, OS compatibility, and resource overhead. VMs are needed when you require a different OS kernel, strong security isolation, or full OS features. Containers are preferred for microservices, fast startup, and lightweight packaging.<br>
+    <strong>How to use this panel:</strong> For each deployment scenario, click <strong>VM</strong>, <strong>Container</strong>, or <strong>Either</strong>. Click <strong>Check All</strong> when done.
+  </div>
+  <div style="display:flex; gap:8px; margin-bottom:12px;">
+    <button onclick="classifyCheckAll()">✓ Check All</button>
+    <button class="secondary" onclick="classifyReset()">↺ Reset</button>
+    <div id="classify-score" style="margin-left:8px; font-size:1rem; color:var(--accent); font-weight:700;"></div>
+  </div>
+  <div class="scenarios" id="scenarios"></div>
+</div>
+
+<script>
+// ─── Stack Builder ─────────────────────────────────────────────────────────────
+
+const STACKS = [
+  { id: 'type1', title: 'Type 1 Hypervisor\n(Bare-metal)', answer: ['Hardware','Hypervisor (Type 1)','Guest OS','Application'] },
+  { id: 'type2', title: 'Type 2 Hypervisor\n(Hosted)', answer: ['Hardware','Host OS','Hypervisor (Type 2)','Guest OS','Application'] },
+  { id: 'container', title: 'Container', answer: ['Hardware','Host OS Kernel','Container Runtime','Container Image','Application'] }
+];
+
+const TILE_COLORS = {
+  'Hardware': '#455a64',
+  'Host OS': '#1565c0',
+  'Host OS Kernel': '#1565c0',
+  'Hypervisor (Type 1)': '#6a1b9a',
+  'Hypervisor (Type 2)': '#6a1b9a',
+  'Guest OS': '#37474f',
+  'Container Runtime': '#1b5e20',
+  'Container Image': '#2e7d32',
+  'Application': '#e65100'
+};
+
+const ALL_TILES = ['Hardware','Host OS','Host OS Kernel','Hypervisor (Type 1)','Hypervisor (Type 2)','Guest OS','Container Runtime','Container Image','Application'];
+
+function buildStackUI() {
+  const bank = document.getElementById('tile-bank');
+  bank.innerHTML = '<span style="font-size:0.75rem; color:var(--muted); margin-right:4px;">Layer tiles:</span>';
+  ALL_TILES.forEach(t => {
+    const el = document.createElement('div');
+    el.className = 'tile';
+    el.textContent = t;
+    el.style.background = TILE_COLORS[t] || '#334';
+    el.draggable = true;
+    el.id = 'tile-' + t.replace(/[^a-z0-9]/gi,'_');
+    el.addEventListener('dragstart', e => { e.dataTransfer.setData('text', t); });
+    bank.appendChild(el);
+  });
+
+  const grid = document.getElementById('stacks-grid');
+  grid.innerHTML = '';
+  STACKS.forEach(stack => {
+    const col = document.createElement('div');
+    col.className = 'stack-col';
+    col.innerHTML = `<h3>${stack.title.replace('\n','<br>')}</h3>`;
+    const maxSlots = stack.answer.length;
+    for (let i = maxSlots; i >= 1; i--) {
+      const lbl = document.createElement('div');
+      lbl.className = 'slot-label';
+      lbl.textContent = i === maxSlots ? '▲ Top (App)' : i === 1 ? '▼ Bottom (Hardware)' : `Layer ${i}`;
+      const zone = document.createElement('div');
+      zone.className = 'drop-zone';
+      zone.dataset.stack = stack.id;
+      zone.dataset.slot = i;
+      zone.textContent = 'Drop here';
+      zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('over'); });
+      zone.addEventListener('dragleave', () => zone.classList.remove('over'));
+      zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.classList.remove('over');
+        const name = e.dataTransfer.getData('text');
+        zone.textContent = name;
+        zone.style.background = TILE_COLORS[name] ? TILE_COLORS[name] + '33' : '';
+        zone.dataset.value = name;
+        zone.classList.remove('correct','wrong');
+      });
+      col.appendChild(lbl);
+      col.appendChild(zone);
+    }
+    grid.appendChild(col);
+  });
+}
+
+function stackCheck() {
+  let correct = 0, total = 0;
+  STACKS.forEach(stack => {
+    const zones = document.querySelectorAll(`.drop-zone[data-stack="${stack.id}"]`);
+    // zones are rendered top→bottom (maxSlots..1), answer is bottom→top (index 0=bottom)
+    const answerLen = stack.answer.length;
+    zones.forEach((z, zi) => {
+      const expectedSlot = answerLen - zi; // slot number
+      const expected = stack.answer[expectedSlot - 1];
+      const actual = z.dataset.value || '';
+      total++;
+      if (actual === expected) { z.classList.add('correct'); z.classList.remove('wrong'); correct++; }
+      else { z.classList.add('wrong'); z.classList.remove('correct'); z.title = `Expected: ${expected}`; }
+    });
+  });
+  document.getElementById('stack-compare').innerHTML =
+    `<div style="padding:8px; background:var(--navy2); border-radius:4px; font-size:0.82rem;">Score: <strong style="color:var(--accent)">${correct}/${total}</strong>. ${correct===total ? '✅ All correct!' : 'Incorrect slots are red — check the expected order: Hardware → OS layers → App.'}</div>`;
+  document.getElementById('stack-compare').style.display = 'block';
+}
+
+function stackReset() { buildStackUI(); document.getElementById('stack-compare').style.display='none'; }
+
+function stackShowComparison() {
+  const html = `<table class="cmp-table">
+  <thead><tr><th>Property</th><th>Type 1 VM</th><th>Type 2 VM</th><th>Container</th></tr></thead>
+  <tbody>
+  <tr><td>Kernel sharing</td><td>No (own kernel)</td><td>No (own kernel)</td><td>Yes (host kernel)</td></tr>
+  <tr><td>Boot time</td><td>Seconds–minutes</td><td>Seconds–minutes</td><td>Milliseconds</td></tr>
+  <tr><td>Memory overhead</td><td>~1–4 GB</td><td>~1–4 GB</td><td>~10–100 MB</td></tr>
+  <tr><td>Isolation level</td><td>Strong</td><td>Strong</td><td>Moderate</td></tr>
+  <tr><td>OS flexibility</td><td>Any OS</td><td>Any OS</td><td>Host kernel only</td></tr>
+  <tr><td>CPU overhead</td><td>~1–5% (VT-x)</td><td>~5–15%</td><td>~0.1–1%</td></tr>
+  <tr><td>Use case</td><td>Cloud multi-tenant</td><td>Development/testing</td><td>Microservices, CI/CD</td></tr>
+  </tbody></table>`;
+  document.getElementById('stack-compare').innerHTML = html;
+  document.getElementById('stack-compare').style.display = 'block';
+}
+
+// ─── Namespace Matcher ─────────────────────────────────────────────────────────
+
+const NS_PAIRS = [
+  { ns: 'PID', desc: 'Process ID isolation — container sees PID 1 as its init' },
+  { ns: 'NET', desc: 'Network stack isolation — separate interfaces, routes, firewall rules' },
+  { ns: 'MNT', desc: 'Filesystem mount point isolation — container has its own rootfs view' },
+  { ns: 'UTS', desc: 'Hostname and domain name isolation' },
+  { ns: 'IPC', desc: 'IPC isolation — separate message queues, semaphores, shared memory' },
+  { ns: 'USER', desc: 'UID/GID isolation — container root ≠ host root' },
+  { ns: 'CGROUP', desc: 'cgroup hierarchy isolation — container sees only its own cgroup tree' }
+];
+
+let nsSelectedLeft = null;
+let nsMatched = new Set();
+let nsCorrectMatches = {};
+
+function buildNS() {
+  const left = document.getElementById('ns-left');
+  const right = document.getElementById('ns-right');
+  left.innerHTML = ''; right.innerHTML = '';
+  const shuffledDescs = [...NS_PAIRS].map(p => p.desc).sort(() => Math.random() - 0.5);
+  NS_PAIRS.forEach(p => {
+    const l = document.createElement('div');
+    l.className = 'match-item';
+    l.textContent = p.ns + ' namespace';
+    l.dataset.ns = p.ns;
+    l.addEventListener('click', () => nsClickLeft(l, p.ns));
+    left.appendChild(l);
+  });
+  shuffledDescs.forEach(d => {
+    const r = document.createElement('div');
+    r.className = 'match-item';
+    r.textContent = d;
+    r.dataset.desc = d;
+    r.addEventListener('click', () => nsClickRight(r, d));
+    right.appendChild(r);
+  });
+  nsSelectedLeft = null;
+  nsMatched.clear();
+  document.getElementById('ns-score').textContent = '0 / 7';
+  document.getElementById('ns-note').textContent = '';
+  // Build answer map
+  nsCorrectMatches = {};
+  NS_PAIRS.forEach(p => nsCorrectMatches[p.ns] = p.desc);
+}
+
+function nsClickLeft(el, ns) {
+  if (nsMatched.has(ns)) return;
+  document.querySelectorAll('#ns-left .match-item').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  nsSelectedLeft = ns;
+}
+
+function nsClickRight(el, desc) {
+  if (!nsSelectedLeft) return;
+  if (el.classList.contains('matched')) return;
+  const correct = nsCorrectMatches[nsSelectedLeft];
+  if (desc === correct) {
+    el.classList.add('matched');
+    const leftEl = document.querySelector(`#ns-left .match-item[data-ns="${nsSelectedLeft}"]`);
+    leftEl.classList.add('matched');
+    leftEl.classList.remove('selected');
+    nsMatched.add(nsSelectedLeft);
+    document.getElementById('ns-score').textContent = nsMatched.size + ' / 7';
+    if (nsMatched.size === 7) document.getElementById('ns-note').textContent = '✅ All matched! Well done.';
+  } else {
+    el.classList.add('wrong-match');
+    setTimeout(() => el.classList.remove('wrong-match'), 800);
+    const leftEl = document.querySelector(`#ns-left .match-item[data-ns="${nsSelectedLeft}"]`);
+    leftEl.classList.add('wrong-match');
+    setTimeout(() => leftEl.classList.remove('wrong-match'), 800);
+  }
+  nsSelectedLeft = null;
+  document.querySelectorAll('#ns-left .match-item').forEach(e => e.classList.remove('selected'));
+}
+
+function nsReset() { buildNS(); }
+
+// ─── Workload Classifier ──────────────────────────────────────────────────────
+
+const SCENARIOS = [
+  { text: 'Run a complete Windows guest OS on a Linux server', answer: 'VM', explain: 'VM required — containers share the host kernel; Windows needs its own kernel.' },
+  { text: 'Deploy 100 microservices each needing isolated Python deps', answer: 'Container', explain: 'Containers are ideal — lightweight, start fast, can package exact dependency versions.' },
+  { text: 'Isolate untrusted third-party code with a strong security boundary', answer: 'VM', explain: 'VM provides stronger isolation — a container escape could reach the host kernel.' },
+  { text: 'Package a Python web app with its exact library versions', answer: 'Container', explain: 'This is exactly what Docker containers are designed for — portable, version-locked packages.' },
+  { text: 'Run a legacy Windows XP application on modern hardware', answer: 'VM', explain: 'Requires the full Windows XP OS — only a VM can run a different kernel.' },
+  { text: 'Deploy a REST API that must start in under 1 second', answer: 'Container', explain: 'Container startup is milliseconds; VM startup takes seconds to minutes.' },
+  { text: 'Provide a full desktop environment to a remote user', answer: 'Either', explain: 'Either works: a VM gives full OS isolation; a container with VNC/RDP is lighter but less isolated.' },
+  { text: 'Host 500 identical stateless web workers on a single server', answer: 'Container', explain: 'Containers are far more efficient at this scale — 500 VMs would require ~500 GB of RAM just for OS images.' }
+];
+
+let classifyAnswers = {};
+
+function buildClassify() {
+  const grid = document.getElementById('scenarios');
+  grid.innerHTML = '';
+  classifyAnswers = {};
+  document.getElementById('classify-score').textContent = '';
+  SCENARIOS.forEach((s, i) => {
+    const card = document.createElement('div');
+    card.className = 'scenario-card';
+    card.id = 'sc-' + i;
+    card.innerHTML = `<p>${i+1}. ${s.text}</p>
+      <div class="classify-btns">
+        <button onclick="classify(${i},'VM')">🖥 VM</button>
+        <button onclick="classify(${i},'Container')">📦 Container</button>
+        <button onclick="classify(${i},'Either')">Both OK</button>
+      </div>
+      <div class="feedback" id="sc-fb-${i}"></div>`;
+    grid.appendChild(card);
+  });
+}
+
+function classify(i, choice) {
+  classifyAnswers[i] = choice;
+  document.getElementById('sc-fb-' + i).innerHTML = `<span style="color:var(--accent)">Selected: ${choice}</span>`;
+  document.getElementById('sc-' + i).classList.remove('correct','wrong');
+}
+
+function classifyCheckAll() {
+  let correct = 0;
+  SCENARIOS.forEach((s, i) => {
+    const ans = classifyAnswers[i];
+    const card = document.getElementById('sc-' + i);
+    const fb = document.getElementById('sc-fb-' + i);
+    if (!ans) { fb.innerHTML = '<span style="color:var(--red)">No answer — please select.</span>'; return; }
+    const ok = ans === s.answer || s.answer === 'Either';
+    if (ok) { card.classList.add('correct'); card.classList.remove('wrong'); correct++; fb.innerHTML = `<span style="color:var(--green)">✓ ${s.answer} — ${s.explain}</span>`; }
+    else { card.classList.add('wrong'); card.classList.remove('correct'); fb.innerHTML = `<span style="color:var(--red)">✗ Expected: ${s.answer} — ${s.explain}</span>`; }
+  });
+  document.getElementById('classify-score').textContent = `Score: ${correct} / ${SCENARIOS.length}`;
+}
+
+function classifyReset() { buildClassify(); }
+
+// ─── Tab switching ────────────────────────────────────────────────────────────
+
+function switchTab(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  const ids = ['stack','ns','classify'];
+  document.querySelectorAll('.tab').forEach((t,i) => { if (ids[i] === id) t.classList.add('active'); });
+}
+
+window.addEventListener('load', () => {
+  buildStackUI();
+  buildNS();
+  buildClassify();
+});
+</script>
+</body>
+</html>
