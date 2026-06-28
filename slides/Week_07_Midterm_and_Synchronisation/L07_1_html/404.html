@@ -4,17 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CS4023 – L7.1 Synchronisation: Critical Sections and Semaphores - Slidev</title>
+<link rel="preload" as="image" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUgAAAFIAQAAAAAab1qeAAACZ0lEQVR4nO1a7YobMQycKXn/V57+GEneQuk50GArSHeETTywlpD1MTKFTfm1CxzkIP8b8gXQTwIFUKD4/CFXu2h03J4QABAEaCPakoCoWm2j0QVIkgAU5iQI0X7JWr1hnw2Qr/WYVhRFCQzX/OTbvxopUXAIBeO7/or8xNu/BPkC0g8p+yYAMROTyku7aHTenlxfKdqW9VyrXTQ6bs8803I+txBQ/H3w7d+HRIRIPX+QPyCUVaUuGp1FMqv2KDNV59y1kxC+2kajC/xT9lJBUnyg/DNXumh0PH5CRKSgPzzy0SVx/HNXpAiZSMcM15RWrTT+uSvpjs7tTGdkBM/4n/i5K9FvihQdK6OKjy4pqk8Ov7SNNAsiuH2XiRGC7j4Vi+f32QKZ+R3IjC5VCYoMoRM/d4Umkgif8vgOVWU68fNdpOQ8BCBIUCnZkWzeh0/eRzpQikHRKwl5AoIZ0Ymf7yEVdnQmQtZLputogv6GffZBUoRIQiKxUjtMMk/83BWl6SKxr26+yHkvdtHoCqRLeDBIUGYuioJp4ueu5DwuWyHmlDjKJCKm8W00Oo90KipXpJ5FqCJRXbDPLsj0Qh/5uByiIu/Cd8/vswMyiCQf7eyQfOXmQY4MH7Irj/tKyCkHFqlct5dO77MLck00F+cJrMtgKkgXjc7Xn/GwSk7VUBM555z6c08e9+synQeltJL85Pe3+6O6umAi9HlvKcecXTQ6758lyoGmv0UkNS3SRqN77Mk1zmSZNud0bTS6ABnn2yVozeFckzKjwAX7bIDM+uhRa1ZTVEcec39+V6ifMZ97+yAH+W/5DWjEgwdmcCJLAAAAAElFTkSuQmCC">
+<link rel="preload" as="image" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUgAAAFIAQAAAAAab1qeAAACXElEQVR4nO1a0WoDMQyTxv3/L2sPsp0UxkjLulyKXSi5i+ASY1uxYwqL8rUKbGQj/wx5AfRIoAAKFOcXOXvKjrbrEwIAggCtRGsSEFWzx+zoBkiSABTqJAjRdsmavcM6D0BeY5haFEUJDNN859c/GilRcAgF41k/It/x9Q9BXkDaIWXbBCAmMams9JQd7dcnxyNF67LGNXvKjrbrM31a5nMLAcXvjV//PCQiRGp+If9BKK1Kp+xoO3LYoQDJfk4w+CnP9NvXeQqSgMiiHoaPiz6Kev4G6zwCeQERLIN6KFT0rCyJ2r3OU5B1nneG5LRTkWpmKk+x8/dFkQTZ1Yt+pMFKMdt8tCYXQFDQFD85ZUlx+mz7fAJZ7q3wdRAETUwSnHbuX+cJSEgaOWUoMJ09AwGE9vc1cQ2ZlcFTxUzB73Qd75gd3SB+RukTmEaujqThdvxclAsVNsGySVORsqysrs8vi5zAZ5RERFRlLE277fj5BDJujURCzt2T2lFJ/B3WeX9k8FE8+ZaDedkxbj77fnNRRsUznpjqpOmIWSQ5ZUfb42f8y8nmGHb8fBkpMpOkYaE+hPpSruPnorifgaXLETPHOZ/t78vIvMakSnvJUFNxpPW5Kpy6lFSpUhWVJ2s9ZUfb9VnDqMSnbuV+poScsqNb8DsiHUoyH3XlypRO2dEd+AjZvSRl0+JUaWp+f84+xzV76FbSAwRtn6sy9dfV+Wj00/qJzUcvIau5JuNm9OBI7HrdM8j0b9L8RFSzstm97XNV8nxUZSWMpKhcHt0/vyqP9aX//nojG/m7fAMWrYYAEmaPrAAAAABJRU5ErkJggg==">
 <link rel="icon" href="https://cdn.jsdelivr.net/gh/slidevjs/slidev/assets/favicon.png">
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta property="slidev:version" content="52.16.0">
 <meta name="description" content="&quot;CS4023 Operating Systems\nUniversity of Limerick, CSIS 2026-27\nAndrew Le Gear\n&quot;">
 <meta property="og:title" content="CS4023 – L7.1 Synchronisation: Critical Sections and Semaphores - Slidev">
-<meta property="og:description" content="&quot;CS4023 Operating Systems\nUniversity of Limerick, CSIS 2026-27\nAndrew Le Gear\n&quot;">  <script type="module" crossorigin src="./assets/index-DzxUBVQA.js"></script>
+<meta property="og:description" content="&quot;CS4023 Operating Systems\nUniversity of Limerick, CSIS 2026-27\nAndrew Le Gear\n&quot;">  <script type="module" crossorigin src="./assets/index-DnmxiNoZ.js"></script>
   <link rel="modulepreload" crossorigin href="./assets/rolldown-runtime-QTnfLwEv.js">
   <link rel="modulepreload" crossorigin href="./assets/modules/shiki-Dm5aQrj-.js">
   <link rel="modulepreload" crossorigin href="./assets/modules/vue--7OTiq9I.js">
   <link rel="stylesheet" crossorigin href="./assets/modules/shiki-BrmBd2_v.css">
-  <link rel="stylesheet" crossorigin href="./assets/index-CZiKXO0o.css">
+  <link rel="stylesheet" crossorigin href="./assets/index-DQqMOKEj.css">
 </head>
 <body>
   <div id="app"></div>

@@ -1,0 +1,11 @@
+import{E as e,R as t,X as n,_ as r,_t as i,g as a,ht as o,v as s,x as c}from"./modules/shiki-Dm5aQrj-.js";import{et as l,tt as u}from"./index-mgtUcao0.js";import{t as d}from"./default-B9S_BWJr.js";``+new URL(`x86_page_table-2QNqoBCF.png`,import.meta.url).href;var f={__name:`L10_1_Paging_and_Page_Tables.md__slidev_10`,setup(f){let{$slidev:p,$nav:m,$clicksContext:h,$clicks:g,$page:_,$renderContext:v,$frontmatter:y}=u();return h.setup(),(u,f)=>(t(),r(d,i(e(o(l)(o(y),9))),{default:n(()=>[f[0]||=a(`h1`,null,`x86-64 Four-Level Page Table`,-1),f[1]||=a(`p`,null,`64-bit addresses → four-level hierarchy (48-bit virtual addresses in practice):`,-1),s(`nanobanana:
+Technical textbook-style diagram on a dark (#1a1a2e) background.
+White labels, orange (#ff8c00) accent lines, blue (#4a90d9) bit-field boxes.
+Flat design, clean sans-serif font, no gradients.
+Top half: one wide horizontal register bar labelled "Virtual Address (48 bits used)" divided into five sections with bit counts: PML4 (9), PDPT (9), PD (9), PT (9), Offset (12). Each section in a different shade of blue/teal.
+Bottom half: vertical flowchart with five boxes connected by orange downward arrows:
+  CR3 → PML4 (512 entries) → PDPT (512 entries) → PD (512 entries, note: 1 GB huge page possible) → PT (512 entries, note: 2 MB huge page possible) → Physical Frame (4 KB).
+Annotation at bottom: "Max: 2⁴⁸ = 256 TB"
+Style: CS course slide illustration, 1200×620 px, PNG.
+Save output as: Lectures/Week_10_Paging_and_Virtual_Memory/assets/x86_page_table.png
+`),f[2]||=a(`img`,{src:``+new URL(`x86_page_table-2QNqoBCF.png`,import.meta.url).href,alt:`x86-64 four-level page table hierarchy`,class:`mx-auto h-52`},null,-1),f[3]||=a(`p`,{class:`text-center text-xs italic text-gray-400 mt-1`},`Diagram generated with AI image generation (nanobanana). Illustrative only.`,-1),f[4]||=a(`p`,null,[a(`strong`,null,`TLB miss = 4 memory accesses`),c(` (PML4 → PDPT → PD → PT → data).`),a(`br`),c(` Mitigated by: large TLB, hardware page-table walkers (CR3 cached in CPU), and huge pages.`)],-1),f[5]||=a(`p`,null,`ARM64 (AArch64) uses a similar four-level scheme: PGD → PUD → PMD → PTE.`,-1)]),_:1},16))}};export{f as default};
