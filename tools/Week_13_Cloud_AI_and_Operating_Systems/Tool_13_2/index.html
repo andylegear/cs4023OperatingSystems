@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tool 13.2 — eBPF &amp; AI/OS Concepts</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+  header{background:#1e293b;padding:1rem 1.5rem;border-bottom:2px solid #f97316}
+  header h1{font-size:1.2rem;color:#f97316}
+  header p{font-size:.85rem;color:#94a3b8;margin-top:.2rem}
+  .tabs{display:flex;background:#1e293b;border-bottom:1px solid #334155}
+  .tab{padding:.75rem 1.25rem;cursor:pointer;font-size:.9rem;color:#94a3b8;border-bottom:3px solid transparent;transition:all .2s}
+  .tab.active{color:#f97316;border-bottom-color:#f97316;background:#0f172a}
+  .tab:hover:not(.active){color:#e2e8f0}
+  .panel{display:none;padding:1.5rem}
+  .panel.active{display:block}
+  h2{font-size:1.05rem;color:#f97316;margin-bottom:.5rem}
+  .instr{font-size:.85rem;color:#94a3b8;margin-bottom:1rem}
+
+  /* Tab 0 — eBPF Probe Matcher */
+  .match-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;max-width:860px}
+  .match-col{display:flex;flex-direction:column;gap:.5rem}
+  .match-item{background:#1e293b;border:2px solid #334155;border-radius:.5rem;padding:.55rem .9rem;cursor:pointer;font-size:.85rem;transition:all .2s}
+  .match-item:hover{border-color:#f97316}
+  .match-item.selected{border-color:#f97316;background:#431407}
+  .match-item.correct{border-color:#22c55e;background:#14532d;cursor:default}
+  .match-item.wrong{border-color:#ef4444;background:#7f1d1d}
+  .match-score{margin-top:.8rem;font-size:.9rem;color:#94a3b8}
+
+  /* Tab 1 — GPU Sharing Selector */
+  .gpu-scenario{background:#1e293b;border:1px solid #334155;border-radius:.75rem;padding:1rem;margin-bottom:.8rem;max-width:800px}
+  .gpu-scenario h3{font-size:.9rem;color:#e2e8f0;margin-bottom:.6rem}
+  .gpu-choices{display:flex;gap:.5rem;flex-wrap:wrap}
+  .gpu-choice{padding:.4rem .9rem;border-radius:.4rem;border:2px solid #334155;background:#0f172a;cursor:pointer;font-size:.82rem;color:#94a3b8;transition:all .2s}
+  .gpu-choice:hover{border-color:#f97316;color:#e2e8f0}
+  .gpu-choice.selected{border-color:#7c3aed;background:#3b0764;color:#e2e8f0}
+  .gpu-choice.correct-sel{border-color:#22c55e;background:#14532d;color:#86efac}
+  .gpu-choice.wrong-sel{border-color:#ef4444;background:#7f1d1d;color:#fca5a5}
+  .gpu-explanation{font-size:.82rem;color:#94a3b8;margin-top:.6rem;display:none;line-height:1.5}
+  .gpu-explanation.show{display:block}
+  .btn-row{display:flex;gap:.6rem;margin-bottom:1rem}
+  .check-btn,.reset-btn{padding:.55rem 1.2rem;border-radius:.5rem;border:none;cursor:pointer;font-size:.9rem;font-weight:600}
+  .check-btn{background:#f97316;color:#0f172a}
+  .reset-btn{background:#334155;color:#e2e8f0}
+  .gpu-score{font-size:.9rem;color:#94a3b8;margin-top:.6rem}
+
+  /* Tab 2 — Concept Map */
+  .concept-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.8rem;max-width:900px}
+  .concept-card{background:#1e293b;border:2px solid #334155;border-radius:.75rem;padding:.9rem;cursor:pointer;transition:all .2s}
+  .concept-card:hover{border-color:#f97316}
+  .concept-card.open{border-color:#f97316;background:#1c1917}
+  .concept-card h3{font-size:.9rem;color:#f97316;margin-bottom:.4rem}
+  .concept-desc{font-size:.82rem;color:#94a3b8;line-height:1.5;display:none}
+  .concept-card.open .concept-desc{display:block}
+  .concept-tag{display:inline-block;background:#334155;color:#94a3b8;border-radius:.3rem;padding:.15rem .5rem;font-size:.75rem;margin:.15rem .1rem 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>Tool 13.2 — eBPF &amp; AI/OS Concepts</h1>
+  <p>CS4023 Operating Systems · Week 13: AI and Operating Systems</p>
+</header>
+<div class="tabs">
+  <div class="tab active" onclick="showTab(0)">🔬 eBPF Probe Matcher</div>
+  <div class="tab" onclick="showTab(1)">🖥️ GPU Sharing Selector</div>
+  <div class="tab" onclick="showTab(2)">🗺️ Module Concept Map</div>
+</div>
+
+<!-- TAB 0 — eBPF Probe Matcher -->
+<div class="panel active" id="p0">
+  <h2>eBPF Probe Type Matcher</h2>
+  <p class="instr">Click a probe type (left), then click its matching description (right).</p>
+  <div class="match-grid">
+    <div class="match-col" id="probeNames"></div>
+    <div class="match-col" id="probeDescs"></div>
+  </div>
+  <div class="match-score" id="ebpfScore"></div>
+</div>
+
+<!-- TAB 1 — GPU Sharing Selector -->
+<div class="panel" id="p1">
+  <h2>GPU Sharing Selector</h2>
+  <p class="instr">For each scenario, select the most appropriate GPU sharing mechanism, then click Check.</p>
+  <div id="gpuScenarios"></div>
+  <div class="btn-row">
+    <button class="check-btn" onclick="checkGpu()">Check Answers</button>
+    <button class="reset-btn" onclick="buildGpu()">Reset</button>
+  </div>
+  <div class="gpu-score" id="gpuScore"></div>
+</div>
+
+<!-- TAB 2 — Module Concept Map -->
+<div class="panel" id="p2">
+  <h2>Module OS Concept Map</h2>
+  <p class="instr">Click any concept to reveal where it appears in AI and cloud systems.</p>
+  <div class="concept-grid" id="conceptGrid"></div>
+</div>
+
+<script>
+// ── TAB 0: eBPF Probe Matcher ─────────────────────────────────────────────────
+const PROBES = [
+  ['kprobe',       'Kernel function entry — instruments any non-inlined kernel function'],
+  ['kretprobe',    'Kernel function return — captures return values and latency'],
+  ['uprobe',       'User-space function entry/return — instruments application code'],
+  ['tracepoint',   'Static kernel instrumentation — low overhead, stable ABI'],
+  ['perf event',   'Hardware performance counters: CPU cycles, cache misses, instructions'],
+  ['XDP',          'eXpress Data Path — network driver level, before sk_buff allocation'],
+  ['TC (traffic control)', 'Network qdisc layer — packet modification and redirection'],
+  ['LSM hook',     'Linux Security Module — security policy enforcement points'],
+];
+let selProbe = null, matchedProbes = new Set();
+
+function buildEbpf() {
+  selProbe = null; matchedProbes.clear();
+  const names = document.getElementById('probeNames');
+  const descs = document.getElementById('probeDescs');
+  names.innerHTML = ''; descs.innerHTML = '';
+  const shuffledDescs = [...PROBES].sort(() => Math.random() - .5);
+  PROBES.forEach(([name]) => {
+    const el = document.createElement('div');
+    el.className = 'match-item'; el.textContent = name; el.dataset.val = name; el.dataset.side = 'name';
+    el.onclick = () => handleEbpf(el);
+    names.appendChild(el);
+  });
+  shuffledDescs.forEach(([, desc]) => {
+    const el = document.createElement('div');
+    el.className = 'match-item'; el.textContent = desc; el.dataset.val = desc; el.dataset.side = 'desc';
+    el.onclick = () => handleEbpf(el);
+    descs.appendChild(el);
+  });
+  document.getElementById('ebpfScore').textContent = '';
+}
+
+let selEbpfName = null, selEbpfDesc = null;
+function handleEbpf(el) {
+  if (el.classList.contains('correct')) return;
+  if (el.dataset.side === 'name') {
+    document.querySelectorAll('#probeNames .match-item').forEach(e => e.classList.remove('selected'));
+    selEbpfName = el; el.classList.add('selected');
+  } else {
+    selEbpfDesc = el;
+  }
+  if (selEbpfName && selEbpfDesc) {
+    const pair = PROBES.find(p => p[0] === selEbpfName.dataset.val);
+    if (pair && pair[1] === selEbpfDesc.dataset.val) {
+      selEbpfName.classList.replace('selected','correct');
+      selEbpfDesc.classList.add('correct');
+      matchedProbes.add(selEbpfName.dataset.val);
+      const score = document.getElementById('ebpfScore');
+      score.textContent = `Matched: ${matchedProbes.size} / ${PROBES.length}`;
+      if (matchedProbes.size === PROBES.length)
+        score.textContent = `✅ All ${PROBES.length} probes matched! XDP runs before sk_buff allocation — ideal for fast packet filtering.`;
+    } else {
+      selEbpfName.classList.add('wrong'); selEbpfDesc.classList.add('wrong');
+      setTimeout(() => { selEbpfName.classList.remove('wrong','selected'); selEbpfDesc.classList.remove('wrong'); }, 700);
+    }
+    selEbpfName = null; selEbpfDesc = null;
+  }
+}
+
+// ── TAB 1: GPU Sharing Selector ───────────────────────────────────────────────
+const GPU_SCENARIOS = [
+  {
+    text: 'Two research teams share one GPU. If one team\'s process crashes, it must not corrupt the other team\'s memory.',
+    ans: 'MIG',
+    explanation: 'MIG (Multi-Instance GPU) provides hardware-level fault isolation between GPU instances. Each MIG partition has dedicated SMs, VRAM, and cache — a crash in one instance cannot affect another.',
+  },
+  {
+    text: 'A single workstation GPU is shared between a developer\'s training experiment and a Jupyter notebook. No strict isolation needed.',
+    ans: 'Time-Slicing',
+    explanation: 'Time-slicing is the default mechanism — the GPU switches contexts between jobs. Simple to configure, but jobs share all GPU memory and a crash in one context can affect others.',
+  },
+  {
+    text: '10 small ML evaluation jobs run in parallel. No isolation required; maximising throughput is the priority.',
+    ans: 'MPS',
+    explanation: 'MPS (Multi-Process Service) allows multiple CUDA contexts to submit work concurrently to the GPU, avoiding context-switch overhead and improving throughput for many small jobs.',
+  },
+  {
+    text: 'Container A runs LLM inference and needs a guaranteed 10 GB VRAM slice. Container B runs training on the remaining memory.',
+    ans: 'MIG',
+    explanation: 'MIG partitions the A100 into slices with guaranteed VRAM. Container A gets a fixed MIG instance (e.g. 1g.10gb) with dedicated memory — no contention with Container B.',
+  },
+  {
+    text: 'Multiple inference servers serving different model endpoints need concurrent GPU access with a shared context for low-latency switching.',
+    ans: 'MPS',
+    explanation: 'MPS creates a single GPU context that serves multiple host processes. Requests are batched and submitted concurrently, reducing PCIe context-switch overhead for latency-sensitive inference.',
+  },
+  {
+    text: 'An older NVIDIA GTX 1080 GPU (no MIG support, pre-Ampere) must be shared between two ML students.',
+    ans: 'Time-Slicing',
+    explanation: 'MIG requires Ampere (A100) or later. MPS is available but less stable on older hardware for mixed workloads. Time-slicing is the universal fallback for any CUDA GPU.',
+  },
+];
+let gpuSelections = {};
+
+function buildGpu() {
+  gpuSelections = {};
+  const container = document.getElementById('gpuScenarios');
+  container.innerHTML = '';
+  GPU_SCENARIOS.forEach((s, i) => {
+    const div = document.createElement('div');
+    div.className = 'gpu-scenario';
+    div.innerHTML = `<h3>Scenario ${i+1}: ${s.text}</h3>
+      <div class="gpu-choices">
+        <div class="gpu-choice" onclick="selectGpu(${i},'Time-Slicing',this)">Time-Slicing</div>
+        <div class="gpu-choice" onclick="selectGpu(${i},'MPS',this)">MPS</div>
+        <div class="gpu-choice" onclick="selectGpu(${i},'MIG',this)">MIG</div>
+      </div>
+      <div class="gpu-explanation" id="gexp${i}">${s.explanation}</div>`;
+    container.appendChild(div);
+  });
+  document.getElementById('gpuScore').textContent = '';
+}
+
+function selectGpu(idx, val, el) {
+  const parent = el.parentElement;
+  parent.querySelectorAll('.gpu-choice').forEach(c => c.classList.remove('selected','correct-sel','wrong-sel'));
+  el.classList.add('selected');
+  gpuSelections[idx] = val;
+}
+
+function checkGpu() {
+  let right = 0;
+  GPU_SCENARIOS.forEach((s, i) => {
+    const sel = gpuSelections[i];
+    const exp = document.getElementById('gexp' + i);
+    const scenario = document.querySelectorAll('.gpu-scenario')[i];
+    scenario.querySelectorAll('.gpu-choice').forEach(c => {
+      c.classList.remove('selected','correct-sel','wrong-sel');
+      if (c.textContent === s.ans) c.classList.add('correct-sel');
+      else if (sel && c.textContent === sel) c.classList.add('wrong-sel');
+    });
+    if (sel === s.ans) right++;
+    exp.classList.add('show');
+  });
+  document.getElementById('gpuScore').textContent = `Score: ${right} / ${GPU_SCENARIOS.length} — green = correct answer`;
+}
+
+// ── TAB 2: Module Concept Map ─────────────────────────────────────────────────
+const CONCEPTS = [
+  {name:'Process / Thread', desc:'AI: each GPU stream is like a thread. Containers are heavyweight processes sharing a kernel. PyTorch DataLoader workers are OS processes.', tags:['GPU streams','containers','data loading']},
+  {name:'CPU Scheduling', desc:'Cloud: kube-scheduler selects nodes (like OS selecting CPUs). GPU: time-slicing, MPS, and MIG are GPU scheduling mechanisms.', tags:['kube-scheduler','GPU time-slicing','MPS','MIG']},
+  {name:'Synchronisation', desc:'Distributed training requires barrier synchronisation across GPUs (all-reduce). CUDA streams use cudaEvent for fine-grained sync.', tags:['all-reduce','NCCL','cudaEvent','barrier']},
+  {name:'Deadlock', desc:'Distributed training can deadlock if all-reduce is asymmetric. K8s resource quotas prevent cluster-level resource deadlock.', tags:['all-reduce','K8s quotas','distributed training']},
+  {name:'Paging', desc:'GPU Unified Virtual Memory (UVM) pages data between CPU DRAM and GPU HBM on demand — GPU analogue of OS paging.', tags:['CUDA UVM','GPU memory','HBM migration']},
+  {name:'Virtual Memory', desc:'CUDA UVM gives CPU and GPU a shared address space. OS maps GPU VRAM as device memory via mmap/cudaMalloc.', tags:['CUDA UVM','mmap','shared address space']},
+  {name:'Page Replacement', desc:'Under GPU memory pressure, UVM evicts pages from GPU back to CPU DRAM (analogous to page-out). Causes significant latency.', tags:['GPU eviction','UVM pressure','page-out']},
+  {name:'File Systems', desc:'Cloud: Ceph (RADOS), GFS, and HDFS are distributed file systems that map OS FS semantics over clusters. S3 is an object store.', tags:['Ceph','GFS','HDFS','S3','NFS']},
+  {name:'I/O Systems', desc:'io_uring enables async I/O for high-throughput data loading in AI training pipelines. NVMe over Fabric extends storage across RDMA.', tags:['io_uring','NVMe','RDMA','data loading']},
+  {name:'Virtualisation', desc:'Cloud is built on hypervisors (KVM, Xen) for VMs. Containers use kernel namespaces + cgroups. Kubernetes orchestrates containerised workloads.', tags:['KVM','containers','K8s','cgroups','namespaces']},
+];
+
+function buildConceptMap() {
+  const grid = document.getElementById('conceptGrid');
+  grid.innerHTML = '';
+  CONCEPTS.forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'concept-card';
+    const tags = c.tags.map(t => `<span class="concept-tag">${t}</span>`).join('');
+    card.innerHTML = `<h3>${c.name}</h3><div class="concept-desc">${c.desc}<div style="margin-top:.4rem">${tags}</div></div>`;
+    card.onclick = () => card.classList.toggle('open');
+    grid.appendChild(card);
+  });
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function showTab(idx) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===idx));
+  document.querySelectorAll('.panel').forEach((p,i) => p.classList.toggle('active', i===idx));
+}
+
+buildEbpf();
+buildGpu();
+buildConceptMap();
+</script>
+</body>
+</html>

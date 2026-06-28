@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tool 13.1 — Cloud Architecture Explorer</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+  header{background:#1e293b;padding:1rem 1.5rem;border-bottom:2px solid #f97316}
+  header h1{font-size:1.2rem;color:#f97316}
+  header p{font-size:.85rem;color:#94a3b8;margin-top:.2rem}
+  .tabs{display:flex;background:#1e293b;border-bottom:1px solid #334155}
+  .tab{padding:.75rem 1.25rem;cursor:pointer;font-size:.9rem;color:#94a3b8;border-bottom:3px solid transparent;transition:all .2s}
+  .tab.active{color:#f97316;border-bottom-color:#f97316;background:#0f172a}
+  .tab:hover:not(.active){color:#e2e8f0}
+  .panel{display:none;padding:1.5rem}
+  .panel.active{display:block}
+  h2{font-size:1.05rem;color:#f97316;margin-bottom:.5rem}
+  .instr{font-size:.85rem;color:#94a3b8;margin-bottom:1rem}
+
+  /* Tab 1 — Cloud Classifier */
+  .service-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.6rem;margin-bottom:1.2rem}
+  .service-card{background:#1e293b;border:2px solid #334155;border-radius:.5rem;padding:.6rem .8rem;cursor:pointer;font-size:.85rem;text-align:center;transition:all .2s;user-select:none}
+  .service-card:hover{border-color:#f97316}
+  .service-card.selected{background:#7c3aed;border-color:#7c3aed}
+  .buckets{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1rem}
+  .bucket{background:#1e293b;border:2px dashed #334155;border-radius:.75rem;padding:1rem;min-height:120px;transition:border-color .2s}
+  .bucket h3{font-size:.9rem;text-align:center;margin-bottom:.6rem}
+  .bucket.iaas h3{color:#22d3ee}
+  .bucket.paas h3{color:#a78bfa}
+  .bucket.saas h3{color:#4ade80}
+  .bucket-items{display:flex;flex-wrap:wrap;gap:.4rem;min-height:60px}
+  .bucket-chip{background:#334155;border-radius:.3rem;padding:.3rem .6rem;font-size:.8rem;cursor:pointer}
+  .bucket-chip:hover{background:#475569}
+  .check-btn,.reset-btn{padding:.55rem 1.2rem;border-radius:.5rem;border:none;cursor:pointer;font-size:.9rem;font-weight:600;margin-right:.5rem}
+  .check-btn{background:#f97316;color:#0f172a}
+  .reset-btn{background:#334155;color:#e2e8f0}
+  .feedback{margin-top:.8rem;font-size:.9rem;padding:.6rem 1rem;border-radius:.5rem;display:none}
+  .feedback.show{display:block}
+  .feedback.ok{background:#14532d;color:#86efac}
+  .feedback.err{background:#7f1d1d;color:#fca5a5}
+
+  /* Tab 2 — K8s Matcher */
+  .match-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+  .match-col{display:flex;flex-direction:column;gap:.5rem}
+  .match-item{background:#1e293b;border:2px solid #334155;border-radius:.5rem;padding:.55rem .9rem;cursor:pointer;font-size:.85rem;transition:all .2s}
+  .match-item:hover{border-color:#f97316}
+  .match-item.selected{border-color:#f97316;background:#431407}
+  .match-item.correct{border-color:#22c55e;background:#14532d;cursor:default}
+  .match-item.wrong{border-color:#ef4444;background:#7f1d1d}
+  .match-score{margin-top:.8rem;font-size:.9rem;color:#94a3b8}
+
+  /* Tab 3 — Sequencer */
+  .seq-instructions{font-size:.85rem;color:#94a3b8;margin-bottom:.8rem}
+  .seq-list{display:flex;flex-direction:column;gap:.5rem;max-width:700px;margin-bottom:1rem}
+  .seq-item{background:#1e293b;border:2px solid #334155;border-radius:.5rem;padding:.6rem 1rem;cursor:grab;font-size:.85rem;display:flex;align-items:center;gap:.7rem;transition:border-color .2s}
+  .seq-item:active{cursor:grabbing}
+  .seq-item.dragging{opacity:.4}
+  .seq-item.over{border-color:#f97316}
+  .seq-item .num{width:1.6rem;height:1.6rem;background:#334155;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;flex-shrink:0}
+  .seq-item.correct-pos{border-color:#22c55e;background:#14532d}
+  .seq-item.wrong-pos{border-color:#ef4444;background:#7f1d1d}
+  .btn-row{display:flex;gap:.6rem;margin-top:.3rem}
+</style>
+</head>
+<body>
+<header>
+  <h1>Tool 13.1 — Cloud Architecture Explorer</h1>
+  <p>CS4023 Operating Systems · Week 13: Cloud Computing and Operating Systems</p>
+</header>
+<div class="tabs">
+  <div class="tab active" onclick="showTab(0)">☁️ Cloud Service Classifier</div>
+  <div class="tab" onclick="showTab(1)">⚙️ K8s OS Analogies</div>
+  <div class="tab" onclick="showTab(2)">🔢 Pod Scheduling Sequencer</div>
+</div>
+
+<!-- TAB 0 — Cloud Classifier -->
+<div class="panel active" id="p0">
+  <h2>Cloud Service Classifier</h2>
+  <p class="instr">Click a service card to select it, then click the target bucket (IaaS / PaaS / SaaS) to place it. Click a chip to return it.</p>
+  <div class="service-grid" id="servicePool"></div>
+  <div class="buckets">
+    <div class="bucket iaas" id="bucket-iaas" onclick="placeSelected('iaas')">
+      <h3>IaaS</h3>
+      <p style="font-size:.75rem;color:#94a3b8;text-align:center;margin-bottom:.4rem">Infrastructure as a Service</p>
+      <div class="bucket-items" id="items-iaas"></div>
+    </div>
+    <div class="bucket paas" id="bucket-paas" onclick="placeSelected('paas')">
+      <h3>PaaS</h3>
+      <p style="font-size:.75rem;color:#94a3b8;text-align:center;margin-bottom:.4rem">Platform as a Service</p>
+      <div class="bucket-items" id="items-paas"></div>
+    </div>
+    <div class="bucket saas" id="bucket-saas" onclick="placeSelected('saas')">
+      <h3>SaaS</h3>
+      <p style="font-size:.75rem;color:#94a3b8;text-align:center;margin-bottom:.4rem">Software as a Service</p>
+      <div class="bucket-items" id="items-saas"></div>
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="check-btn" onclick="checkClassifier()">Check Answers</button>
+    <button class="reset-btn" onclick="resetClassifier()">Reset</button>
+  </div>
+  <div class="feedback" id="fb0"></div>
+</div>
+
+<!-- TAB 1 — K8s Matcher -->
+<div class="panel" id="p1">
+  <h2>Kubernetes OS Analogy Matcher</h2>
+  <p class="instr">Click one OS concept (left) then click its Kubernetes equivalent (right) to match them.</p>
+  <div class="match-grid">
+    <div class="match-col" id="osConcepts"></div>
+    <div class="match-col" id="k8sConcepts"></div>
+  </div>
+  <div class="match-score" id="matchScore"></div>
+</div>
+
+<!-- TAB 2 — Sequencer -->
+<div class="panel" id="p2">
+  <h2>Pod Scheduling Sequencer</h2>
+  <p class="seq-instructions">Drag the steps into the correct order for Kubernetes pod scheduling.</p>
+  <div class="seq-list" id="seqList"></div>
+  <div class="btn-row">
+    <button class="check-btn" onclick="checkSeq()">Check Order</button>
+    <button class="reset-btn" onclick="resetSeq()">Shuffle</button>
+  </div>
+  <div class="feedback" id="fb2"></div>
+</div>
+
+<script>
+// ── TAB 0: Cloud Classifier ──────────────────────────────────────────────────
+const SERVICES = [
+  {name:'AWS EC2',         ans:'iaas'},
+  {name:'Azure App Service',ans:'paas'},
+  {name:'Google Gmail',    ans:'saas'},
+  {name:'Azure K8s Service',ans:'paas'},
+  {name:'Heroku',          ans:'paas'},
+  {name:'AWS S3',          ans:'iaas'},
+  {name:'Google Cloud Run',ans:'paas'},
+  {name:'Microsoft 365',   ans:'saas'},
+  {name:'DigitalOcean VMs',ans:'iaas'},
+  {name:'AWS Lambda',      ans:'paas'},
+];
+let placement = {}; // name → bucket
+let selectedSvc = null;
+
+function buildClassifier() {
+  placement = {};
+  selectedSvc = null;
+  const pool = document.getElementById('servicePool');
+  pool.innerHTML = '';
+  ['iaas','paas','saas'].forEach(b => document.getElementById('items-'+b).innerHTML = '');
+  SERVICES.forEach(s => {
+    const el = document.createElement('div');
+    el.className = 'service-card';
+    el.textContent = s.name;
+    el.onclick = () => selectService(s.name, el);
+    el.id = 'svc-' + s.name.replace(/\s+/g,'_');
+    pool.appendChild(el);
+  });
+  document.getElementById('fb0').className = 'feedback';
+}
+
+function selectService(name, el) {
+  if (el.parentElement.id !== 'servicePool') return;
+  document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
+  selectedSvc = name;
+  el.classList.add('selected');
+}
+
+function placeSelected(bucket) {
+  if (!selectedSvc) return;
+  const id = 'svc-' + selectedSvc.replace(/\s+/g,'_');
+  const el = document.getElementById(id);
+  if (!el || el.parentElement.id !== 'servicePool') return;
+  placement[selectedSvc] = bucket;
+  el.classList.remove('selected');
+  const chip = document.createElement('div');
+  chip.className = 'bucket-chip';
+  chip.textContent = selectedSvc;
+  chip.onclick = () => { returnToPool(selectedSvc, chip, bucket); };
+  document.getElementById('items-' + bucket).appendChild(chip);
+  el.style.display = 'none';
+  selectedSvc = null;
+  document.getElementById('fb0').className = 'feedback';
+}
+
+function returnToPool(name, chip, bucket) {
+  delete placement[name];
+  chip.remove();
+  const el = document.getElementById('svc-' + name.replace(/\s+/g,'_'));
+  el.style.display = '';
+  document.getElementById('fb0').className = 'feedback';
+}
+
+function checkClassifier() {
+  let right = 0, wrong = 0, missing = [];
+  SERVICES.forEach(s => {
+    if (!placement[s.name]) { missing.push(s.name); return; }
+    if (placement[s.name] === s.ans) right++;
+    else wrong++;
+  });
+  const fb = document.getElementById('fb0');
+  if (missing.length) {
+    fb.textContent = `${SERVICES.length - missing.length} placed. Still to classify: ${missing.join(', ')}`;
+    fb.className = 'feedback show err';
+  } else if (wrong === 0) {
+    fb.textContent = `✅ Perfect! All ${right} correct. AWS Lambda is PaaS (FaaS), AWS S3 is IaaS (object storage), AKS is PaaS (managed K8s).`;
+    fb.className = 'feedback show ok';
+  } else {
+    const wrongs = SERVICES.filter(s => placement[s.name] && placement[s.name] !== s.ans).map(s => `${s.name} → ${s.ans.toUpperCase()}`).join(', ');
+    fb.textContent = `${right} correct, ${wrong} wrong. Corrections: ${wrongs}`;
+    fb.className = 'feedback show err';
+  }
+}
+
+function resetClassifier() { buildClassifier(); }
+
+// ── TAB 1: K8s Matcher ───────────────────────────────────────────────────────
+const PAIRS = [
+  ['Process', 'Pod'],
+  ['CPU Scheduler', 'kube-scheduler'],
+  ['Process Isolation', 'Namespace + cgroup'],
+  ['IPC', 'Service (ClusterIP + DNS)'],
+  ['File system', 'Persistent Volume (PV)'],
+  ['Process group', 'Deployment / ReplicaSet'],
+  ['Init system', 'DaemonSet'],
+  ['ulimit', 'Resource requests/limits'],
+];
+let selOS = null, selK8s = null, matched = new Set();
+
+function buildMatcher() {
+  selOS = null; selK8s = null; matched.clear();
+  const osCol = document.getElementById('osConcepts');
+  const k8sCol = document.getElementById('k8sConcepts');
+  osCol.innerHTML = ''; k8sCol.innerHTML = '';
+  const shuffleK8s = [...PAIRS.map(p=>p[1])].sort(()=>Math.random()-.5);
+  PAIRS.forEach(([os]) => {
+    const el = document.createElement('div');
+    el.className = 'match-item'; el.textContent = os; el.dataset.val = os; el.dataset.side = 'os';
+    el.onclick = () => handleMatch(el);
+    osCol.appendChild(el);
+  });
+  shuffleK8s.forEach(k8s => {
+    const el = document.createElement('div');
+    el.className = 'match-item'; el.textContent = k8s; el.dataset.val = k8s; el.dataset.side = 'k8s';
+    el.onclick = () => handleMatch(el);
+    k8sCol.appendChild(el);
+  });
+  document.getElementById('matchScore').textContent = '';
+}
+
+function handleMatch(el) {
+  if (el.classList.contains('correct')) return;
+  if (el.dataset.side === 'os') {
+    document.querySelectorAll('#osConcepts .match-item').forEach(e => e.classList.remove('selected'));
+    selOS = el; el.classList.add('selected');
+  } else {
+    selK8s = el;
+  }
+  if (selOS && selK8s) {
+    const pair = PAIRS.find(p => p[0] === selOS.dataset.val);
+    if (pair && pair[1] === selK8s.dataset.val) {
+      selOS.classList.replace('selected','correct');
+      selK8s.classList.add('correct');
+      matched.add(selOS.dataset.val);
+      document.getElementById('matchScore').textContent = `Matched: ${matched.size} / ${PAIRS.length}`;
+      if (matched.size === PAIRS.length)
+        document.getElementById('matchScore').textContent = `✅ All ${PAIRS.length} pairs matched! Kubernetes is an OS for clusters.`;
+    } else {
+      selOS.classList.add('wrong'); selK8s.classList.add('wrong');
+      setTimeout(() => { selOS.classList.remove('wrong','selected'); selK8s.classList.remove('wrong'); }, 700);
+    }
+    selOS = null; selK8s = null;
+  }
+}
+
+// ── TAB 2: Sequencer ─────────────────────────────────────────────────────────
+const SEQ_STEPS = [
+  'kubectl apply → API Server stores desired state in etcd',
+  'kube-scheduler filters nodes (CPU/RAM check)',
+  'kube-scheduler scores and binds pod to node (writes to etcd)',
+  'kubelet on chosen node detects new pod assignment',
+  'containerd → runc: clone namespaces, set cgroups, mount overlayfs',
+  'Pod Running — kubelet reports health back to API server',
+];
+let dragSrc = null;
+
+function buildSeq() {
+  const list = document.getElementById('seqList');
+  list.innerHTML = '';
+  const shuffled = [...SEQ_STEPS].sort(() => Math.random() - .5);
+  shuffled.forEach((text, i) => {
+    const item = document.createElement('div');
+    item.className = 'seq-item';
+    item.draggable = true;
+    item.dataset.text = text;
+    item.innerHTML = `<div class="num">${i+1}</div><span>${text}</span>`;
+    item.addEventListener('dragstart', e => { dragSrc = item; item.classList.add('dragging'); });
+    item.addEventListener('dragend', () => { item.classList.remove('dragging'); renumber(); });
+    item.addEventListener('dragover', e => { e.preventDefault(); item.classList.add('over'); });
+    item.addEventListener('dragleave', () => item.classList.remove('over'));
+    item.addEventListener('drop', e => {
+      e.preventDefault(); item.classList.remove('over');
+      if (dragSrc && dragSrc !== item) list.insertBefore(dragSrc, item);
+    });
+    list.appendChild(item);
+  });
+  document.getElementById('fb2').className = 'feedback';
+}
+
+function renumber() {
+  document.querySelectorAll('.seq-item').forEach((el, i) => {
+    el.querySelector('.num').textContent = i + 1;
+    el.classList.remove('correct-pos', 'wrong-pos');
+  });
+}
+
+function checkSeq() {
+  const items = [...document.querySelectorAll('.seq-item')];
+  let allRight = true;
+  items.forEach((el, i) => {
+    const correct = el.dataset.text === SEQ_STEPS[i];
+    el.querySelector('.num').textContent = i + 1;
+    el.classList.remove('correct-pos', 'wrong-pos');
+    el.classList.add(correct ? 'correct-pos' : 'wrong-pos');
+    if (!correct) allRight = false;
+  });
+  const fb = document.getElementById('fb2');
+  if (allRight) {
+    fb.textContent = '✅ Correct order! The Bind step writes to etcd (not directly to kubelet) because kubelet watches etcd — this keeps the API server as the single source of truth.';
+    fb.className = 'feedback show ok';
+  } else {
+    fb.textContent = 'Not quite — green = correct position, red = wrong. Hint: scheduler writes to etcd BEFORE kubelet acts.';
+    fb.className = 'feedback show err';
+  }
+}
+
+function resetSeq() { buildSeq(); }
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function showTab(idx) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===idx));
+  document.querySelectorAll('.panel').forEach((p,i) => p.classList.toggle('active', i===idx));
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+buildClassifier();
+buildMatcher();
+buildSeq();
+</script>
+</body>
+</html>
