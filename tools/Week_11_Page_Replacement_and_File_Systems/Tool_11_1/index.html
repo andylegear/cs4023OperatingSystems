@@ -109,7 +109,8 @@
 <!-- TAB 1: Algorithm Racer -->
 <div id="tab-racer" class="panel active">
   <div class="info-box">
-    Race FIFO, LRU, and Clock (second-chance) on the same reference string. Use <strong>Step</strong> to advance one reference at a time, or <strong>Play</strong> to animate.
+    <strong>What is happening?</strong> Each column simulates a different page replacement algorithm running on the <em>same</em> reference string with the same number of frames. When a requested page is not in any frame it is a <strong class="fault-cell">FAULT</strong> — the OS must load it from disk. When it is already present it is a <strong class="hit-cell">HIT</strong> — no disk I/O. The algorithms differ in <em>which</em> frame to evict when all frames are full.
+    <br>Use <strong>Step →</strong> to advance one reference at a time (watch what changes), or <strong>▶ Play</strong> to animate at 0.8 s/step.
   </div>
   <div class="controls">
     <label>Reference string:</label>
@@ -148,12 +149,15 @@
 <!-- TAB 2: Belady's Anomaly -->
 <div id="tab-belady" class="panel">
   <div class="info-box">
-    FIFO is <strong>not a stack algorithm</strong> — increasing frame count does <em>not</em> guarantee fewer page faults. Drag the slider to see Belady's Anomaly on the classic reference string.
+    FIFO is <strong>not a stack algorithm</strong> — increasing the frame count does <em>not</em> always reduce page faults. Use the slider below to scan across frame counts and watch for the anomaly.
   </div>
-  <div class="controls">
+  <div class="controls" style="align-items:center">
     <label>Reference string: <strong>1 2 3 4 1 2 5 1 2 3 4 5</strong></label>
-    <label>Max frames to show:</label>
-    <input type="number" id="belady-max" value="6" min="2" max="8" onchange="beladyUpdate()">
+    <label>Max frames:</label>
+    <input type="range" id="belady-max" value="6" min="2" max="8" step="1"
+           oninput="beladyUpdate(); document.getElementById('belady-max-val').textContent=this.value"
+           style="width:160px;accent-color:var(--accent)">
+    <span id="belady-max-val" style="color:var(--accent);font-weight:700;min-width:16px">6</span>
   </div>
   <div class="belady-container">
     <div class="chart-wrap">
@@ -173,8 +177,9 @@
         <li>FIFO with <strong>3 frames: 9 faults</strong></li>
         <li>FIFO with <strong>4 frames: <span class="highlight-anomaly">10 faults</span></strong> ← MORE frames, MORE faults!</li>
       </ul>
-      <p style="margin-top:10px"><span class="highlight-anomaly">FIFO</span> is not a stack algorithm — its set of pages with <em>n+1</em> frames is not always a superset of pages with <em>n</em> frames.</p>
-      <p style="margin-top:8px"><span class="no-anomaly">LRU and OPT are stack algorithms</span> — they are immune to Belady's anomaly. More frames always means ≤ page faults.</p>
+      <p style="margin-top:10px"><strong>Why does this happen?</strong> FIFO evicts the page that has been in memory the <em>longest</em>, regardless of whether it will be needed soon. With more frames, FIFO can end up keeping different pages resident at different moments — so the set of pages it holds with 4 frames is not necessarily a superset of the set it holds with 3 frames.</p>
+      <p style="margin-top:8px"><span class="highlight-anomaly">FIFO</span> is not a stack algorithm — adding a frame can change <em>which</em> pages are kept, not just add one more.</p>
+      <p style="margin-top:8px"><span class="no-anomaly">LRU and OPT are stack algorithms</span> — the set of resident pages with <em>n+1</em> frames is always a superset of the set with <em>n</em> frames. More frames → always ≤ faults. This property is called the <strong>inclusion property</strong>.</p>
     </div>
   </div>
 </div>
@@ -182,7 +187,7 @@
 <!-- TAB 3: Build Your Own -->
 <div id="tab-byo" class="panel">
   <div class="info-box">
-    Enter any reference string and frame count. Select algorithms and click <strong>Run</strong> to compare fault counts and see full traces.
+    <strong>Build your own experiment.</strong> Enter any space-separated reference string and choose a frame count. Tick the algorithms you want to compare, then click <strong>Run</strong> to see fault counts, hit rates, and a full trace for each. Try enabling <strong>OPT</strong> — the theoretically optimal algorithm (fewest possible faults) — to see how close the practical algorithms get.
   </div>
   <div class="controls">
     <label>Reference string:</label>

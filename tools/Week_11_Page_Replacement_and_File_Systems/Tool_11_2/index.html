@@ -111,7 +111,9 @@
 <!-- PANEL 1: Inode Structure -->
 <div id="tab-structure" class="panel active">
   <div class="info-box">
-    Click any pointer slot in the inode to explore what it points to. Direct pointers point to data blocks directly; indirect pointers route through index blocks.
+    <strong>What is an inode?</strong> In Linux ext4, every file (and directory) has exactly one <em>inode</em> — a fixed-size metadata record stored on disk that contains the file’s size, timestamps, permissions, and a set of <strong>pointer slots</strong> that tell the OS where the file’s data blocks live on disk.
+    <br><strong>How to use this panel:</strong> Click any pointer slot in the inode diagram. The slots are grouped by type: 12&nbsp;direct pointers, 1&nbsp;single-indirect, 1&nbsp;double-indirect, and 1&nbsp;triple-indirect. Each click reveals a detailed explanation of how that pointer is resolved to data.
+    <br><em>Direct pointer</em> — one read to get the data block. <em>Single-indirect</em> — one extra block read (the index block), then the data block. <em>Double-indirect</em> — two extra reads. <em>Triple-indirect</em> — three extra reads. The penalty grows, but so does the range of addressable file content.
   </div>
   <div class="inode-layout">
     <div>
@@ -130,7 +132,9 @@
 <!-- PANEL 2: Calculator -->
 <div id="tab-calculator" class="panel">
   <div class="info-box">
-    Adjust block size and pointer size to see how the maximum file size changes. The inode has 12 direct, 1 single indirect, 1 double indirect, and 1 triple indirect pointer.
+    <strong>How big can a file be?</strong> The inode holds exactly 15 pointer slots: 12&nbsp;direct, 1&nbsp;single-indirect, 1&nbsp;double-indirect, 1&nbsp;triple-indirect. Each slot can eventually address a different number of data blocks depending on how many pointers fit in one block (<em>ptrs/block</em> = block_size ÷ ptr_size).
+    <br><strong>How to use this panel:</strong> Change the block size or pointer size and watch the table update. The <em>Pointers per block</em> figure is the key multiplier: indirect levels multiply it repeatedly, so the triple-indirect level alone can address (ptrs/block)³ data blocks. Compare the 512 B vs 4 KB block sizes to see why larger blocks produce dramatically bigger maximum file sizes.
+    <br>Try 4 KB blocks / 4-byte pointers (classic 32-bit ext2) — that gives 1024 pointers per block and a maximum file size just over <strong>4 GB</strong>.
   </div>
   <div class="calc-grid">
     <div class="calc-controls">
@@ -169,7 +173,8 @@
 <!-- PANEL 3: Traversal -->
 <div id="tab-traversal" class="panel">
   <div class="info-box">
-    Enter a byte offset in a file to see exactly how the OS traverses the inode structure to find the right disk block, and how many disk I/O operations are required.
+    <strong>How does the OS locate a specific byte in a file?</strong> Given a <em>byte offset</em>, the kernel converts it to a block number (offset ÷ block_size), then decides whether that block is addressed by a direct, single-indirect, double-indirect, or triple-indirect pointer. Each level of indirection requires one additional disk read (an “index block” fetch) before the data block itself can be read. Accessing byte 0 costs 1 I/O; accessing a byte in the triple-indirect region costs 4 I/Os just to <em>find</em> the block.
+    <br><strong>How to use this panel:</strong> Enter a byte offset (try 0, 50&thinsp;000, 5&thinsp;000&thinsp;000, 500&thinsp;000&thinsp;000). Click <strong>Find Block →</strong> to see the full traversal path: which pointer tier the block falls in, each index-block lookup, and the total I/O count. Change the block size to see how the boundary between tiers shifts.
   </div>
   <div class="trav-grid">
     <div class="trav-controls">
