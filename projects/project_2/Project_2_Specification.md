@@ -1,6 +1,6 @@
 # CS4023 Operating Systems
 ## Project 2 – Parallel Matrix Multiplication
-**Worth: 10% of module grade | Announced: 28 September 2026 (Week 4) | Due: Friday 16 October 2026, 23:59**
+**Worth: 10% of module grade | Announced: 01 October 2026 (Week 4) | Due: Thursday 15 October 2026, 17:00**
 
 ---
 

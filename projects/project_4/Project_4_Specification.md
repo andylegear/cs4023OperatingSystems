@@ -1,6 +1,6 @@
 # CS4023 Operating Systems
 ## Project 4 – CPU Scheduling Simulator
-**Worth: 10% of module grade | Announced: 26 October 2026 (Week 8) | Due: Friday 13 November 2026, 23:59**
+**Worth: 10% of module grade | Announced: 29 October 2026 (Week 8) | Due: Thursday 12 November 2026, 17:00**
 
 ---
 

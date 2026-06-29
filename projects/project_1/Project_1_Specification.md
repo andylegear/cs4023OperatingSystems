@@ -1,6 +1,6 @@
 # CS4023 Operating Systems
 ## Project 1 – Mini-Shell
-**Worth: 10% of module grade | Announced: 14 September 2026 (Week 2) | Due: Friday 02 October 2026, 23:59**
+**Worth: 10% of module grade | Announced: 17 September 2026 (Week 2) | Due: Thursday 01 October 2026, 17:00**
 
 ---
 

@@ -1,6 +1,6 @@
 # CS4023 Operating Systems
 ## Project 5 – Page Replacement Simulator
-**Worth: 10% of module grade | Announced: 09 November 2026 (Week 10) | Due: Friday 04 December 2026, 23:59**
+**Worth: 10% of module grade | Announced: 05 November 2026 (Week 9) | Due: Thursday 26 November 2026, 17:00**
 
 ---
 

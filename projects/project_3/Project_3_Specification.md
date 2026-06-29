@@ -1,6 +1,6 @@
 # CS4023 Operating Systems
 ## Project 3 – Readers-Writers Synchronisation
-**Worth: 10% of module grade | Announced: 12 October 2026 (Week 6) | Due: Friday 30 October 2026, 23:59**
+**Worth: 10% of module grade | Announced: 15 October 2026 (Week 6) | Due: Thursday 29 October 2026, 17:00**
 
 ---
 
