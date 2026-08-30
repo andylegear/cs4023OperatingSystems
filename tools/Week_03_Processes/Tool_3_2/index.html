@@ -214,6 +214,7 @@ let currentScenario = null;
 let currentStep = -1;
 let autoTimer = null;
 let quizAnswered = {};
+let quizAttempts = 0; // how many quiz questions answered so far, right or wrong
 
 function loadScenario() {
   clearInterval(autoTimer);
@@ -223,6 +224,7 @@ function loadScenario() {
   currentScenario = scenarios[key];
   currentStep = -1;
   quizAnswered = {};
+  quizAttempts = 0;
   renderCode();
   clearTree();
   document.getElementById('annotation').innerHTML = 'Press <strong>Step</strong> to begin execution trace.';
@@ -267,8 +269,8 @@ function doStep() {
     // Show quiz
     showQuiz();
     if (window.Telemetry) {
-      Telemetry.updateProgress(currentStep + 1, steps.length);
-      Telemetry.markComplete();
+      Telemetry.updateProgress(currentStep + 1, steps.length, quizAttempts);
+      Telemetry.markComplete(quizAttempts);
     }
     clearInterval(autoTimer);
     autoTimer = null;
@@ -287,6 +289,7 @@ function doStep() {
   // Draw tree
   drawTree(step);
   document.getElementById('stepCounter').textContent = `Step ${currentStep+1} / ${steps.length} — ${currentScenario.title}`;
+  if (window.Telemetry) Telemetry.updateProgress(currentStep + 1, steps.length, quizAttempts);
   if (currentStep === steps.length - 1) {
     document.getElementById('stepBtn').textContent = '🧠 Quiz';
   }
@@ -394,6 +397,8 @@ function showQuiz() {
 function answerQ(qi, oi) {
   if (quizAnswered[qi]) return;
   quizAnswered[qi] = true;
+  quizAttempts++;
+  if (window.Telemetry) Telemetry.updateProgress(currentScenario.steps.length, currentScenario.steps.length, quizAttempts);
   const q = currentScenario.quiz[qi];
   for (let j = 0; j < q.opts.length; j++) {
     const btn = document.getElementById(`q${qi}o${j}`);

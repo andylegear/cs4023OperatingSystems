@@ -331,6 +331,8 @@ function handleAnswer(choice, btn) {
     fb.className = 'feedback wrong';
     fb.textContent = `❌ Not quite. That describes a different transition. Try again!`;
   }
+  const attemptsTotal = Object.values(attemptMap).reduce((a, b) => a + b, 0);
+  if (window.Telemetry) Telemetry.updateProgress(score, transitions.length, attemptsTotal);
 }
 
 function showPCB(t) {
@@ -377,7 +379,7 @@ function showFinal() {
   document.getElementById('finalScreen').classList.add('active');
   if (window.Telemetry) {
     const attemptsTotal = Object.values(attemptMap).reduce((a, b) => a + b, 0);
-    Telemetry.updateProgress(score, maxScore);
+    Telemetry.updateProgress(score, maxScore, attemptsTotal);
     Telemetry.markComplete(attemptsTotal);
   }
 }

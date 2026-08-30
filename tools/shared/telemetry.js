@@ -147,11 +147,14 @@
   }
 
   // Fire-and-forget snapshot of in-progress score; lets analysis derive % complete over time.
-  function updateProgress(score, maxScore) {
+  // attemptsTotal (optional) is how many questions have been answered so far (right or wrong),
+  // which may be higher than score if the tool allows retries.
+  function updateProgress(score, maxScore, attemptsTotal) {
     sendEvent("progress", {
       active_seconds: capSeconds(activeSeconds),
       score: score,
       max_score: maxScore,
+      attempts_total: attemptsTotal != null ? attemptsTotal : null,
     });
   }
 

@@ -356,6 +356,7 @@ function replay() {
 }
 
 /* Quiz */
+let quizAttempts = 0; // how many times the quiz has been submitted
 function checkQuiz() {
   let score = 0;
   ['q1','q2','q3'].forEach(q => {
@@ -373,10 +374,11 @@ function checkQuiz() {
       }
     }
   });
+  quizAttempts++;
   document.getElementById('quiz-score').textContent = `Score: ${score} / 3`;
   if (window.Telemetry) {
-    Telemetry.updateProgress(score, 3);
-    Telemetry.markComplete();
+    Telemetry.updateProgress(score, 3, quizAttempts);
+    Telemetry.markComplete(quizAttempts);
   }
 }
 

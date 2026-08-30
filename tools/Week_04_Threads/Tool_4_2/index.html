@@ -295,6 +295,7 @@ function tryMatch() {
   pairs[selectedFn] = selectedDesc;
   selectedFn = null; selectedDesc = null;
 }
+let checkAttempts = 0; // how many times "check" has been submitted
 function checkAll() {
   let correct = 0;
   Object.entries(pairs).forEach(([fId, dId]) => {
@@ -314,9 +315,10 @@ function checkAll() {
   // clear pending
   selectedFn = null; selectedDesc = null;
   const total = Object.keys(pairs).length;
+  checkAttempts++;
   document.getElementById('matchScore').textContent = `${correct} / ${fns.length} matched`;
-  if (window.Telemetry) Telemetry.updateProgress(correct, fns.length);
-  if (correct === fns.length && window.Telemetry) Telemetry.markComplete();
+  if (window.Telemetry) Telemetry.updateProgress(correct, fns.length, checkAttempts);
+  if (correct === fns.length && window.Telemetry) Telemetry.markComplete(checkAttempts);
   Object.keys(pairs).forEach(k => delete pairs[k]);
 }
 function showAllAnswers() {

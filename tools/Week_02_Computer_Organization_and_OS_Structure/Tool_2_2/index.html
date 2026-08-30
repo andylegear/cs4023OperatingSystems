@@ -598,6 +598,7 @@ function showQuiz() {
   document.querySelector('.quiz-footer button:first-child').disabled = false;
 }
 
+let orderAttempts = 0; // how many times the order has been submitted
 function checkOrder() {
   const flow = FLOWS[currentSyscall];
   let score = 0;
@@ -609,10 +610,11 @@ function checkOrder() {
     if (item.id === flow.quizOrder[idx]) { item.classList.add('correct-pos'); score++; }
     else item.classList.add('wrong-pos');
   });
+  orderAttempts++;
   document.getElementById('quiz-score').textContent = `Score: ${score} / 4`;
   if (window.Telemetry) {
-    Telemetry.updateProgress(score, 4);
-    Telemetry.markComplete();
+    Telemetry.updateProgress(score, 4, orderAttempts);
+    Telemetry.markComplete(orderAttempts);
   }
 }
 

@@ -372,6 +372,8 @@ function returnChipToPool(chip, data) {
   if (origTag) { origTag.style.display = ''; origTag.classList.remove('correct','wrong'); }
 }
 
+let checkAttempts = 0; // how many times "check answers" has been submitted
+
 function checkAnswers() {
   let correct = 0;
   CHALLENGE.forEach(c => {
@@ -386,9 +388,10 @@ function checkAnswers() {
       chip.title = `Correct: ${c.decade} — tap to try again`;
     }
   });
+  checkAttempts++;
   document.getElementById('ch-score').textContent = correct;
-  if (window.Telemetry) Telemetry.updateProgress(correct, CHALLENGE.length);
-  if (correct === CHALLENGE.length && window.Telemetry) Telemetry.markComplete();
+  if (window.Telemetry) Telemetry.updateProgress(correct, CHALLENGE.length, checkAttempts);
+  if (correct === CHALLENGE.length && window.Telemetry) Telemetry.markComplete(checkAttempts);
 }
 
 function resetChallenge() {

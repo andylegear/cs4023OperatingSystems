@@ -282,6 +282,7 @@ const statements = [
 
 const placement = {};
 let checked = false;
+let checkAttempts = 0; // how many times the challenge has been submitted
 
 function buildCards() {
   const pool = document.getElementById('stmtPool');
@@ -322,8 +323,9 @@ function checkChallenge() {
   });
   document.getElementById('scoreDisplay').textContent = `Score: ${correct} / ${statements.length}`;
   checked = true;
-  if (window.Telemetry) Telemetry.updateProgress(correct, statements.length);
-  if (correct === statements.length && window.Telemetry) Telemetry.markComplete();
+  checkAttempts++;
+  if (window.Telemetry) Telemetry.updateProgress(correct, statements.length, checkAttempts);
+  if (correct === statements.length && window.Telemetry) Telemetry.markComplete(checkAttempts);
 }
 
 function resetChallenge() {

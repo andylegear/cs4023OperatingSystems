@@ -166,6 +166,7 @@ const CARDS = [
 
 // ── State ──
 let score = 0;
+let attempts = 0; // how many cards answered so far, right or wrong
 let placed = 0; // how many placed correctly (used to track total answered)
 let dragCard = null; // { el, data }
 
@@ -181,7 +182,7 @@ function shuffle(arr) {
 
 // ── Build DOM ──
 function build() {
-  score = 0; placed = 0;
+  score = 0; attempts = 0; placed = 0;
   updateScore();
 
   // Zones
@@ -247,15 +248,16 @@ function handleDrop(zoneCat) {
   if (el.classList.contains('placed-correct') || el.classList.contains('placed-wrong')) return;
 
   const correct = data.cat === zoneCat;
+  attempts++;
   if (correct) {
     score++;
     updateScore();
     el.classList.add('placed-correct');
-    if (window.Telemetry) Telemetry.updateProgress(score, CARDS.length);
-    if (score === CARDS.length && window.Telemetry) Telemetry.markComplete();
   } else {
     el.classList.add('placed-wrong');
   }
+  if (window.Telemetry) Telemetry.updateProgress(score, CARDS.length, attempts);
+  if (score === CARDS.length && window.Telemetry) Telemetry.markComplete(attempts);
 
   // Move card to zone
   const zoneCards = document.querySelector(`[data-zone="${zoneCat}"]`);
