@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Qualitative Coding Tool — Human Coder</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+  h1 { font-size: 1.3rem; }
+  #name-screen, #coder-screen { display: none; }
+  #name-screen.active, #coder-screen.active { display: block; }
+  .meta { color: #666; font-size: 0.85rem; margin-bottom: 0.5rem; }
+  .segment-text { font-size: 1.15rem; padding: 1rem; background: #f4f4f4; border-radius: 6px; margin-bottom: 1rem; }
+  fieldset { border: 1px solid #ddd; border-radius: 6px; margin-bottom: 1rem; }
+  legend { font-weight: 600; padding: 0 0.4rem; }
+  label.code-option { display: block; margin: 0.3rem 0; cursor: pointer; }
+  label.code-option .code-desc { color: #777; font-size: 0.8rem; margin-left: 1.5rem; display: block; }
+  textarea { width: 100%; box-sizing: border-box; min-height: 3rem; }
+  .nav-row { display: flex; gap: 0.5rem; margin-top: 1rem; align-items: center; }
+  .nav-row button { padding: 0.5rem 1rem; }
+  #progress { margin-left: auto; color: #555; font-size: 0.9rem; }
+  #status { min-height: 1.2rem; font-size: 0.85rem; color: #0a7a0a; }
+  #status.error { color: #b00020; }
+  input[type=text] { padding: 0.4rem; font-size: 1rem; width: 100%; box-sizing: border-box; }
+</style>
+</head>
+<body>
+
+<div id="name-screen" class="active">
+  <h1>Qualitative Coding Tool</h1>
+  <p>Enter your name to begin. This identifies your codings in the shared database — codings from
+  different coders are compared for reliability, so please use a consistent name each session.</p>
+  <input type="text" id="coder-name-input" placeholder="e.g. Andrew">
+  <div class="nav-row">
+    <button id="start-btn">Start Coding</button>
+  </div>
+</div>
+
+<div id="coder-screen">
+  <h1>Qualitative Coding — <span id="coder-name-label"></span></h1>
+  <div class="meta" id="segment-meta"></div>
+  <div class="segment-text" id="segment-text"></div>
+
+  <fieldset>
+    <legend>Primary code (required)</legend>
+    <div id="primary-codes"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Secondary codes (optional, up to 2)</legend>
+    <div id="secondary-codes"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Confidence</legend>
+    <label><input type="radio" name="confidence" value="HIGH"> HIGH</label>
+    <label><input type="radio" name="confidence" value="MEDIUM"> MEDIUM</label>
+    <label><input type="radio" name="confidence" value="LOW"> LOW</label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Rationale (optional)</legend>
+    <textarea id="rationale"></textarea>
+  </fieldset>
+
+  <div id="status"></div>
+
+  <div class="nav-row">
+    <button id="prev-btn">&larr; Prev</button>
+    <button id="save-next-btn">Save &amp; Next &rarr;</button>
+    <button id="skip-btn">Skip</button>
+    <span id="progress"></span>
+  </div>
+</div>
+
+<script src="supabase-client.js"></script>
+<script src="segments-data.js"></script>
+<script>
+let segments = [];
+let categories = [];
+let coderName = "";
+let existingCodings = {};
+let currentIndex = 0;
+
+const nameScreen = document.getElementById("name-screen");
+const coderScreen = document.getElementById("coder-screen");
+const statusEl = document.getElementById("status");
+
+function setStatus(msg, isError) {
+  statusEl.textContent = msg;
+  statusEl.className = isError ? "error" : "";
+}
+
+function renderCodeOptions(containerId, name, inputType) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = "";
+  for (const cat of categories) {
+    const label = document.createElement("label");
+    label.className = "code-option";
+    const input = document.createElement("input");
+    input.type = inputType;
+    input.name = name;
+    input.value = cat.code;
+    label.appendChild(input);
+    label.appendChild(document.createTextNode(" " + cat.label + " (" + cat.code + ")"));
+    const desc = document.createElement("span");
+    desc.className = "code-desc";
+    desc.textContent = cat.description;
+    label.appendChild(desc);
+    container.appendChild(label);
+  }
+}
+
+function clearForm() {
+  document.querySelectorAll('input[name="primary_code"]').forEach(i => (i.checked = false));
+  document.querySelectorAll('input[name="secondary_code"]').forEach(i => (i.checked = false));
+  document.querySelectorAll('input[name="confidence"]').forEach(i => (i.checked = false));
+  document.getElementById("rationale").value = "";
+}
+
+function fillFormFromExisting(segmentId) {
+  const existing = existingCodings[segmentId];
+  if (!existing) return;
+  const primaryInput = document.querySelector(`input[name="primary_code"][value="${existing.primary_code}"]`);
+  if (primaryInput) primaryInput.checked = true;
+  for (const code of existing.secondary_codes || []) {
+    const secInput = document.querySelector(`input[name="secondary_code"][value="${code}"]`);
+    if (secInput) secInput.checked = true;
+  }
+  if (existing.confidence) {
+    const confInput = document.querySelector(`input[name="confidence"][value="${existing.confidence}"]`);
+    if (confInput) confInput.checked = true;
+  }
+  document.getElementById("rationale").value = existing.rationale || "";
+}
+
+function renderSegment() {
+  const seg = segments[currentIndex];
+  document.getElementById("segment-meta").textContent =
+    `${seg.label} — ${seg.artifact_name || seg.artifact_id} (${seg.reviewer || seg.coordinator || "unknown"})`;
+  document.getElementById("segment-text").textContent = seg.text;
+  document.getElementById("progress").textContent = `${currentIndex + 1} / ${segments.length}`;
+  clearForm();
+  fillFormFromExisting(seg.id);
+  setStatus("");
+}
+
+function collectFormRow() {
+  const seg = segments[currentIndex];
+  const primary = document.querySelector('input[name="primary_code"]:checked');
+  if (!primary) {
+    setStatus("Please select a primary code before saving.", true);
+    return null;
+  }
+  const secondary = Array.from(document.querySelectorAll('input[name="secondary_code"]:checked'))
+    .map(i => i.value)
+    .slice(0, 2);
+  const confidenceInput = document.querySelector('input[name="confidence"]:checked');
+  return {
+    segment_id: seg.id,
+    coder_name: coderName,
+    coder_type: "human",
+    primary_code: primary.value,
+    secondary_codes: secondary,
+    confidence: confidenceInput ? confidenceInput.value : null,
+    rationale: document.getElementById("rationale").value || null,
+    segment_text: seg.text,
+    source_meta: { source: seg.source, artifact_id: seg.artifact_id, field: seg.field },
+  };
+}
+
+async function saveAndAdvance() {
+  const row = collectFormRow();
+  if (!row) return;
+  try {
+    setStatus("Saving...");
+    await upsertCoding(row);
+    existingCodings[row.segment_id] = row;
+    setStatus("Saved.");
+    if (currentIndex < segments.length - 1) {
+      currentIndex += 1;
+      renderSegment();
+    } else {
+      setStatus("All segments coded. You can still go back and revise any answer.");
+    }
+  } catch (err) {
+    setStatus("Save failed: " + err.message, true);
+  }
+}
+
+document.getElementById("start-btn").addEventListener("click", async () => {
+  const input = document.getElementById("coder-name-input").value.trim();
+  if (!input) {
+    alert("Please enter your name.");
+    return;
+  }
+  coderName = input;
+  localStorage.setItem("qc_coder_name", coderName);
+  document.getElementById("coder-name-label").textContent = coderName;
+
+  segments = QC_SEGMENTS.segments;
+  categories = QC_CODEBOOK.categories;
+  renderCodeOptions("primary-codes", "primary_code", "radio");
+  renderCodeOptions("secondary-codes", "secondary_code", "checkbox");
+
+  try {
+    existingCodings = await fetchCodingsForCoder(coderName);
+  } catch (err) {
+    setStatus("Could not load existing codings: " + err.message, true);
+  }
+
+  nameScreen.classList.remove("active");
+  coderScreen.classList.add("active");
+  currentIndex = 0;
+  renderSegment();
+});
+
+document.getElementById("save-next-btn").addEventListener("click", saveAndAdvance);
+
+document.getElementById("skip-btn").addEventListener("click", () => {
+  if (currentIndex < segments.length - 1) {
+    currentIndex += 1;
+    renderSegment();
+  }
+});
+
+document.getElementById("prev-btn").addEventListener("click", () => {
+  if (currentIndex > 0) {
+    currentIndex -= 1;
+    renderSegment();
+  }
+});
+
+const savedName = localStorage.getItem("qc_coder_name");
+if (savedName) document.getElementById("coder-name-input").value = savedName;
+</script>
+</body>
+</html>

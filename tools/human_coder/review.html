@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Qualitative Coding — Review</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 1100px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+  h1 { font-size: 1.3rem; }
+  .filters { display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th, td { border: 1px solid #ddd; padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; }
+  th { background: #f4f4f4; }
+  tr.agree { background: #eaffea; }
+  tr.partial { background: #fff8e1; }
+  tr.disagree { background: #ffecec; }
+  .segment-text { max-width: 320px; }
+  .coder-col { font-size: 0.85rem; }
+  select, input { padding: 0.3rem; }
+  #summary { margin: 1rem 0; font-size: 0.9rem; color: #444; }
+</style>
+</head>
+<body>
+<h1>Qualitative Coding — Review</h1>
+<div class="filters">
+  <label>Coder: <select id="coder-filter"><option value="">All</option></select></label>
+  <label>Category: <select id="category-filter"><option value="">All</option></select></label>
+  <button id="refresh-btn">Refresh</button>
+</div>
+<div id="summary"></div>
+<table id="results-table">
+  <thead>
+    <tr><th>Segment</th><th>Text</th><th>Codings by coder</th><th>Agreement</th></tr>
+  </thead>
+  <tbody id="results-body"></tbody>
+</table>
+
+<script src="supabase-client.js"></script>
+<script>
+let allRows = [];
+
+function agreementClass(codingsForSegment) {
+  const primaries = codingsForSegment.map(c => c.primary_code);
+  const unique = new Set(primaries);
+  if (unique.size <= 1) return "agree";
+  if (unique.size === primaries.length) return "disagree";
+  return "partial";
+}
+
+function groupBySegment(rows) {
+  const groups = {};
+  for (const row of rows) {
+    if (!groups[row.segment_id]) groups[row.segment_id] = [];
+    groups[row.segment_id].push(row);
+  }
+  return groups;
+}
+
+function render() {
+  const coderFilter = document.getElementById("coder-filter").value;
+  const categoryFilter = document.getElementById("category-filter").value;
+
+  let rows = allRows;
+  if (coderFilter) rows = rows.filter(r => r.coder_name === coderFilter);
+  if (categoryFilter) {
+    rows = rows.filter(
+      r => r.primary_code === categoryFilter || (r.secondary_codes || []).includes(categoryFilter)
+    );
+  }
+
+  const groups = groupBySegment(rows);
+  const tbody = document.getElementById("results-body");
+  tbody.innerHTML = "";
+
+  const segmentIds = Object.keys(groups).sort();
+  let agreeCount = 0;
+  for (const segmentId of segmentIds) {
+    const codings = groups[segmentId];
+    const cls = agreementClass(codings);
+    if (cls === "agree") agreeCount += 1;
+    const tr = document.createElement("tr");
+    tr.className = cls;
+
+    const segCell = document.createElement("td");
+    segCell.textContent = segmentId;
+    tr.appendChild(segCell);
+
+    const textCell = document.createElement("td");
+    textCell.className = "segment-text";
+    textCell.textContent = codings[0].segment_text || "";
+    tr.appendChild(textCell);
+
+    const coderCell = document.createElement("td");
+    coderCell.className = "coder-col";
+    coderCell.innerHTML = codings
+      .map(c => {
+        const sec = (c.secondary_codes || []).length ? ` +${c.secondary_codes.join(", ")}` : "";
+        return `<div><strong>${c.coder_name}</strong> (${c.coder_type}): ${c.primary_code}${sec} [${c.confidence || "n/a"}]</div>`;
+      })
+      .join("");
+    tr.appendChild(coderCell);
+
+    const agreeCell = document.createElement("td");
+    agreeCell.textContent = cls;
+    tr.appendChild(agreeCell);
+
+    tbody.appendChild(tr);
+  }
+
+  document.getElementById("summary").textContent =
+    `${segmentIds.length} segments shown, ${agreeCount} with full primary-code agreement (${
+      segmentIds.length ? Math.round((agreeCount / segmentIds.length) * 100) : 0
+    }%).`;
+}
+
+function populateFilters(rows) {
+  const coderSelect = document.getElementById("coder-filter");
+  const categorySelect = document.getElementById("category-filter");
+  const coders = [...new Set(rows.map(r => r.coder_name))].sort();
+  const categories = [...new Set(rows.flatMap(r => [r.primary_code, ...(r.secondary_codes || [])]))].sort();
+
+  coderSelect.innerHTML = '<option value="">All</option>' + coders.map(c => `<option value="${c}">${c}</option>`).join("");
+  categorySelect.innerHTML = '<option value="">All</option>' + categories.map(c => `<option value="${c}">${c}</option>`).join("");
+}
+
+async function load() {
+  allRows = await fetchAllCodings();
+  populateFilters(allRows);
+  render();
+}
+
+document.getElementById("refresh-btn").addEventListener("click", load);
+document.getElementById("coder-filter").addEventListener("change", render);
+document.getElementById("category-filter").addEventListener("change", render);
+
+load();
+</script>
+</body>
+</html>
