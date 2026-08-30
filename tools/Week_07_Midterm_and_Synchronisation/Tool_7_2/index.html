@@ -177,6 +177,7 @@ h1{text-align:center;font-size:1.3rem;color:#ff8c00;margin-bottom:4px}
   <div id="chResult"></div>
 </div>
 
+<script src="../../shared/telemetry.js"></script>
 <script>
 // ─── State ────────────────────────────────────────────────────────────────────
 let S = 1;        // semaphore value
@@ -192,6 +193,14 @@ let scenDesc = '';
 // Challenge state
 let challengeOps = [];
 let challengeAnswer = {finalS: 0, blocked: []};
+let challengesCorrect = 0;
+let t72Complete = false;
+
+function reportT72(){
+  if(!window.Telemetry) return;
+  Telemetry.updateProgress(challengesCorrect, 3, opCount);
+  if(!t72Complete && challengesCorrect>=3){ t72Complete=true; Telemetry.markComplete(opCount); }
+}
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 function getConfig() {
@@ -294,6 +303,7 @@ function doPSem(i) {
   } else {
     addLog('ok', `Thread ${i+1}: P(S) → S=${S}`);
   }
+  reportT72();
 }
 
 function doVSem(i) {
@@ -311,6 +321,7 @@ function doVSem(i) {
     wokeMsg = ` [unblocked Thread ${woke+1}]`;
   }
   addLog('V', `Thread ${i+1}: V(S) → S=${S}${wokeMsg}`);
+  reportT72();
 }
 
 // ─── Trace log ────────────────────────────────────────────────────────────────
@@ -388,6 +399,8 @@ function checkChallenge() {
       Final S = <b>${correctS}</b>. Blocked: <b>${blockedStr}</b>.
       ${!sOk ? `(Your S: ${guessS})` : ''} ${!bOk ? `(Your blocked: ${guessBlockedArr.length?guessBlockedArr.map(x=>'Thread '+x).join(', '):'none'})` : ''}
     </div>`;
+  if (allOk) challengesCorrect++;
+  reportT72();
 }
 
 async function playChallengeTrace() {
@@ -405,6 +418,7 @@ async function playChallengeTrace() {
 }
 
 // Init
+if (window.Telemetry) Telemetry.init("7_2", 7);
 applyConfig();
 </script>
 </body>

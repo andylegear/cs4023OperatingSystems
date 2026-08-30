@@ -126,8 +126,7 @@
   </div>
   <div class="feedback" id="fb2"></div>
 </div>
-
-<script>
+<script src="../../shared/telemetry.js"></script><script>
 // ── TAB 0: Cloud Classifier ──────────────────────────────────────────────────
 const SERVICES = [
   {name:'AWS EC2',         ans:'iaas'},
@@ -143,6 +142,17 @@ const SERVICES = [
 ];
 let placement = {}; // name → bucket
 let selectedSvc = null;
+let t131Attempts = 0;
+let t131ClassifierCorrect = 0;
+let t131SeqCorrect = 0;
+let t131Complete = false;
+
+function reportT131() {
+  if (!window.Telemetry) return;
+  const score = t131ClassifierCorrect + matched.size + t131SeqCorrect;
+  Telemetry.updateProgress(score, 24, t131Attempts);
+  if (!t131Complete && score === 24) { t131Complete = true; Telemetry.markComplete(t131Attempts); }
+}
 
 function buildClassifier() {
   placement = {};
@@ -212,6 +222,9 @@ function checkClassifier() {
     fb.textContent = `${right} correct, ${wrong} wrong. Corrections: ${wrongs}`;
     fb.className = 'feedback show err';
   }
+  t131Attempts++;
+  t131ClassifierCorrect = right;
+  reportT131();
 }
 
 function resetClassifier() { buildClassifier(); }
@@ -260,6 +273,7 @@ function handleMatch(el) {
   }
   if (selOS && selK8s) {
     const pair = PAIRS.find(p => p[0] === selOS.dataset.val);
+    t131Attempts++;
     if (pair && pair[1] === selK8s.dataset.val) {
       selOS.classList.replace('selected','correct');
       selK8s.classList.add('correct');
@@ -272,6 +286,7 @@ function handleMatch(el) {
       setTimeout(() => { selOS.classList.remove('wrong','selected'); selK8s.classList.remove('wrong'); }, 700);
     }
     selOS = null; selK8s = null;
+    reportT131();
   }
 }
 
@@ -319,12 +334,13 @@ function renumber() {
 function checkSeq() {
   const items = [...document.querySelectorAll('.seq-item')];
   let allRight = true;
+  let numCorrect = 0;
   items.forEach((el, i) => {
     const correct = el.dataset.text === SEQ_STEPS[i];
     el.querySelector('.num').textContent = i + 1;
     el.classList.remove('correct-pos', 'wrong-pos');
     el.classList.add(correct ? 'correct-pos' : 'wrong-pos');
-    if (!correct) allRight = false;
+    if (correct) numCorrect++; else allRight = false;
   });
   const fb = document.getElementById('fb2');
   if (allRight) {
@@ -334,6 +350,9 @@ function checkSeq() {
     fb.textContent = 'Not quite — green = correct position, red = wrong. Hint: scheduler writes to etcd BEFORE kubelet acts.';
     fb.className = 'feedback show err';
   }
+  t131Attempts++;
+  t131SeqCorrect = numCorrect;
+  reportT131();
 }
 
 function resetSeq() { buildSeq(); }
@@ -344,7 +363,8 @@ function showTab(idx) {
   document.querySelectorAll('.panel').forEach((p,i) => p.classList.toggle('active', i===idx));
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
+// ── Init ─────────────────────────────────────────────────────
+if (window.Telemetry) Telemetry.init("13_1", 13);
 buildClassifier();
 buildMatcher();
 buildSeq();

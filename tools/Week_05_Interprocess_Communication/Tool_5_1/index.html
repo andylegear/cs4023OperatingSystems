@@ -220,13 +220,24 @@
 
 </div><!-- /main -->
 
+<script src="../../shared/telemetry.js"></script>
 <script>
-// ════════════════════════════════════════
+// ═══════════════════════════════════
 // SHARED MEMORY SECTION
-// ════════════════════════════════════════
+// ═══════════════════════════════════
 let shmCreated = false;
 let semaActive = false;
 let raceInterval = null;
+let t51Attempts = 0;
+const t51Checkpoints = { create: false, race: false, sema: false };
+let t51Complete = false;
+
+function reportT51() {
+  if (!window.Telemetry) return;
+  const score = Object.values(t51Checkpoints).filter(Boolean).length;
+  Telemetry.updateProgress(score, 3, t51Attempts);
+  if (!t51Complete && score === 3) { t51Complete = true; Telemetry.markComplete(t51Attempts); }
+}
 
 const shmA = document.getElementById('shmA');
 const shmB = document.getElementById('shmB');
@@ -253,6 +264,9 @@ document.getElementById('btnCreate').addEventListener('click', () => {
   btnRace.disabled = false;
   btnSema.disabled = false;
   showStatus(raceStatus, 'info', 'Shared region created — /dev/shm/cs4023_demo mapped into both address spaces at the same virtual offset.');
+  t51Attempts++;
+  t51Checkpoints.create = true;
+  reportT51();
 });
 
 shmInput.addEventListener('input', () => {
@@ -266,6 +280,7 @@ shmInput.addEventListener('input', () => {
 
 document.getElementById('btnRace').addEventListener('click', () => {
   if (!shmCreated) return;
+  t51Attempts++;
   if (raceInterval) { clearInterval(raceInterval); raceInterval = null; }
   let counter = 0;
   const target = 10; // simulated
@@ -286,12 +301,15 @@ document.getElementById('btnRace').addEventListener('click', () => {
       const expected = 20000;
       const got = counter + Math.floor(Math.random() * 8000) + 1000; // random < expected
       showStatus(raceStatus, 'err', `Race condition! Expected ~${expected.toLocaleString()}, got ${got.toLocaleString()} — lost updates due to non-atomic read-modify-write.`);
+      t51Checkpoints.race = true;
+      reportT51();
     }
   }, 80);
 });
 
 document.getElementById('btnSema').addEventListener('click', () => {
   if (!shmCreated) return;
+  t51Attempts++;
   if (raceInterval) { clearInterval(raceInterval); raceInterval = null; }
   semaActive = true;
   let counter = 0;
@@ -307,6 +325,8 @@ document.getElementById('btnSema').addEventListener('click', () => {
     if (writes >= 20) {
       clearInterval(raceInterval); raceInterval = null;
       showStatus(raceStatus, 'ok', `✓ Correct result: ${counter * 1000} (scaled) — mutex serialised all writes. No lost updates.`);
+      t51Checkpoints.sema = true;
+      reportT51();
     }
   }, 80);
 });
@@ -389,6 +409,7 @@ function showStatus(el, type, msg) {
   el.textContent = msg;
   el.className = 'status-box show ' + type;
 }
+if (window.Telemetry) Telemetry.init("5_1", 5);
 </script>
 </body>
 </html>

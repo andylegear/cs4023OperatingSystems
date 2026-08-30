@@ -228,6 +228,7 @@
   </div>
 </div>
 
+<script src="../../shared/telemetry.js"></script>
 <script>
 // ════════════════════════════════════════
 // TAB SWITCHING
@@ -259,6 +260,21 @@ const ALL_TILES = [
 
 let serverSlotData = Array(6).fill(null);
 let clientSlotData = Array(6).fill(null);
+let seqAttempts = 0;
+let scenarioAttempts = 0;
+let lastSeqCorrect = 0;
+let lastScenarioCorrect = 0;
+let telemetryComplete = false;
+
+// Reports one cumulative score across both tabs since Telemetry.init() is called once per tool.
+function reportTelemetry() {
+  if (!window.Telemetry) return;
+  Telemetry.updateProgress(lastSeqCorrect + lastScenarioCorrect, 15, seqAttempts + scenarioAttempts);
+  if (!telemetryComplete && lastSeqCorrect === 10 && lastScenarioCorrect === SCENARIOS.length) {
+    telemetryComplete = true;
+    Telemetry.markComplete(seqAttempts + scenarioAttempts);
+  }
+}
 let draggingTile = null;
 
 function buildSequenceUI() {
@@ -361,6 +377,9 @@ function checkSequence() {
   });
 
   document.getElementById('scoreVal').textContent = `${correct}/10`;
+  seqAttempts++;
+  lastSeqCorrect = correct;
+  reportTelemetry();
   const status = document.getElementById('seqStatus');
   if (correct === 10) {
     showStatus(status, 'ok', '✓ Perfect! All API calls are in the correct order. You can now animate the connection.');
@@ -458,6 +477,8 @@ function buildScenarios() {
 
   const placed = Object.keys(scenarioPlaced).length;
   const correct = Object.entries(scenarioPlaced).filter(([id,z]) => SCENARIOS.find(s=>s.id===id).answer===z).length;
+  lastScenarioCorrect = correct;
+  reportTelemetry();
   if (placed === SCENARIOS.length) {
     showStatus(document.getElementById('scenarioStatus'), correct===SCENARIOS.length ? 'ok' : 'err',
       `${correct}/${SCENARIOS.length} correct.` + (correct<SCENARIOS.length ? ' Review the red items above.' : ' Well done!'));
@@ -471,6 +492,7 @@ function zoneDrop(e, zone) {
   if (!scenarioDragging) return;
   scenarioPlaced[scenarioDragging.id] = zone;
   scenarioDragging = null;
+  scenarioAttempts++;
   buildScenarios();
 }
 
@@ -486,6 +508,7 @@ function showStatus(el, type, msg) {
 }
 
 // init
+if (window.Telemetry) Telemetry.init("5_2", 5);
 buildSequenceUI();
 buildScenarios();
 </script>

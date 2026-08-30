@@ -200,11 +200,21 @@ input[type=number]{width:64px;background:#1f1f2e;border:1px solid #444;color:#e0
   <div id="histContainer" style="background:#1a1a2e;border:1px solid #333;border-radius:10px;padding:12px;max-width:500px;margin:0 auto"></div>
 </div>
 
+<script src="../../shared/telemetry.js"></script>
 <script>
-// ─── State ───────────────────────────────────────────────────────────────────
+// ─── State ──────────────────────────────────────────────────
 let mode = 'none';      // 'none' | 'mutex' | 'atomic'
 let running = false;
 let simId = 0;          // cancel stale sims
+let t71Attempts = 0;
+const t71ModesRun = new Set();
+let t71Complete = false;
+
+function reportT71() {
+  if (!window.Telemetry) return;
+  Telemetry.updateProgress(t71ModesRun.size, 3, t71Attempts);
+  if (!t71Complete && t71ModesRun.size === 3) { t71Complete = true; Telemetry.markComplete(t71Attempts); }
+}
 
 const THREADS = 3;
 let counter = 0;
@@ -267,6 +277,9 @@ async function runSim() {
   if (running) return;
   running = true; const myId = ++simId;
   document.getElementById('runBtn').disabled = true;
+  t71Attempts++;
+  t71ModesRun.add(mode);
+  reportT71();
   counter = 0; mutex = false; mutexHolder = -1;
   const iters = getIters();
   const expected = THREADS * iters;
@@ -508,6 +521,7 @@ function evaluateInterleave() {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // Init
+if (window.Telemetry) Telemetry.init("7_1", 7);
 renderInstrs();
 </script>
 </body>

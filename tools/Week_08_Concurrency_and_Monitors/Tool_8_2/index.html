@@ -195,6 +195,7 @@ arrived++;
   <div class="sim-output" id="simOutput" style="display:none"></div>
 </div>
 
+<script src="../../shared/telemetry.js"></script>
 <script>
 // === Tab switching ===
 function switchTab(i){
@@ -217,9 +218,20 @@ const bugHints={
   4:'Hint: how many threads are waiting on the barrier condition? How many does signal() wake?'
 };
 let scores1=new Array(4).fill(false);
+let t82Attempts=0;
+let t82MonitorCorrect=0;
+let t82Complete=false;
+
+function reportT82(){
+  if(!window.Telemetry) return;
+  const score=scores1.filter(Boolean).length+scores2.filter(Boolean).length+t82MonitorCorrect;
+  Telemetry.updateProgress(score,17,t82Attempts);
+  if(!t82Complete && score===17){ t82Complete=true; Telemetry.markComplete(t82Attempts); }
+}
 
 function checkBug(q,val){
   if(!val) return;
+  t82Attempts++;
   const fb=document.getElementById('fb'+q);
   if(val===bugAnswers[q]){
     fb.className='feedback correct';
@@ -229,6 +241,7 @@ function checkBug(q,val){
     fb.className='feedback incorrect';
     fb.innerHTML='❌ '+bugHints[q];
   }
+  reportT82();
 }
 
 // === TAB 2: Signal vs Broadcast ===
@@ -262,6 +275,7 @@ function buildSvb(){
 }
 
 function checkSvb(i,choice){
+  t82Attempts++;
   const item=svbData[i];
   const fb=document.getElementById('svbfb'+i);
   if(choice===item.correct){
@@ -272,6 +286,7 @@ function checkSvb(i,choice){
     fb.className='feedback incorrect';
     fb.innerHTML=`❌ <strong>${choice}</strong> is not ideal here — ${item.why}`;
   }
+  reportT82();
 }
 
 // === TAB 3: Monitor Fill-in ===
@@ -351,6 +366,7 @@ function makeBlank(id){
 }
 
 function checkMonitor(){
+  t82Attempts++;
   let correct=0;
   const fb=[];
   for(const b of blanks){
@@ -364,6 +380,7 @@ function checkMonitor(){
       fb.push(`${b.id}: expected <code>${b.answer}</code>`);
     }
   }
+  t82MonitorCorrect=correct;
   const out=document.getElementById('monitorFeedback');
   if(correct===blanks.length){
     out.innerHTML='<span style="color:#86efac">✅ All correct! The monitor is complete. Click ▶ Simulate to see it in action.</span>';
@@ -372,6 +389,7 @@ function checkMonitor(){
   } else {
     out.innerHTML=`<span style="color:#fca5a5">❌ ${correct}/${blanks.length} correct. Wrong: ${fb.join(', ')}</span>`;
   }
+  reportT82();
 }
 
 function showSolution(){
@@ -416,6 +434,7 @@ function runSimulation(){
 }
 
 // Init
+if (window.Telemetry) Telemetry.init("8_2", 8);
 buildSvb();
 buildMonitor();
 </script>

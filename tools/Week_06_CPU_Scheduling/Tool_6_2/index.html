@@ -138,6 +138,7 @@
 
 </div>
 
+<script src="../../shared/telemetry.js"></script>
 <script>
 const COLORS = ['#4a90d9','#e8734a','#6abf69','#9c6bca','#e8b84a','#4ab8b8'];
 const DEFAULT = [{name:'P1',arrival:0,burst:8},{name:'P2',arrival:1,burst:4},{name:'P3',arrival:2,burst:9},{name:'P4',arrival:3,burst:5}];
@@ -276,6 +277,16 @@ function updateSliderFill(slider){
 
 let currentSegs=[];
 let animTimer2=null;
+let t62Attempts=0;
+const t62Checkpoints={red:false,yellow:false,green:false,cfs:false};
+let t62Complete=false;
+
+function reportT62(){
+  if(!window.Telemetry) return;
+  const score=Object.values(t62Checkpoints).filter(Boolean).length;
+  Telemetry.updateProgress(score,4,t62Attempts);
+  if(!t62Complete && score===4){ t62Complete=true; Telemetry.markComplete(t62Attempts); }
+}
 
 function rebuild(){
   if(animTimer2){clearInterval(animTimer2);animTimer2=null;}
@@ -294,6 +305,10 @@ function rebuild(){
   document.getElementById('banner-red').style.display    = q<=2 ? 'block':'none';
   document.getElementById('banner-yellow').style.display = q>=maxBurst ? 'block':'none';
   document.getElementById('banner-green').style.display  = (q>=4&&q<=6&&q<maxBurst&&q>2) ? 'block':'none';
+  if(q<=2) t62Checkpoints.red=true;
+  if(q>=maxBurst) t62Checkpoints.yellow=true;
+  if(q>=4&&q<=6&&q<maxBurst&&q>2) t62Checkpoints.green=true;
+  reportT62();
   // update nice table names
   refreshNiceTable(procs);
 }
@@ -301,6 +316,7 @@ function rebuild(){
 function onSlider(el){
   document.getElementById('quantum-val').textContent=el.value;
   updateSliderFill(el);
+  t62Attempts++;
   rebuild();
 }
 
@@ -381,6 +397,9 @@ function cfsStep(){
   cfsState.vruntimes[best]+=deltaV;
   cfsState.running=best;
   cfsState.tick++;
+  t62Attempts++;
+  if(cfsState.tick>=3) t62Checkpoints.cfs=true;
+  reportT62();
   renderCfsBars(best);
   const sliceMs=(slice/1e6).toFixed(2);
   document.getElementById('cfs-status').textContent=
@@ -409,6 +428,7 @@ function renderCfsBars(running){
 }
 
 // ── Init ──────────────────────────────────────────────────
+if (window.Telemetry) Telemetry.init("6_2", 6);
 loadDefault();
 updateSliderFill(document.getElementById('quantum-slider'));
 </script>

@@ -208,7 +208,19 @@
   </div>
 </div>
 
+<script src="../../shared/telemetry.js"></script>
 <script>
+let t112Attempts = 0;
+const t112Checkpoints = { direct: false, si: false, di: false, ti: false, traversal: false };
+let t112Complete = false;
+
+function reportT112() {
+  if (!window.Telemetry) return;
+  const score = Object.values(t112Checkpoints).filter(Boolean).length;
+  Telemetry.updateProgress(score, 5, t112Attempts);
+  if (!t112Complete && score === 5) { t112Complete = true; Telemetry.markComplete(t112Attempts); }
+}
+
 // ============================================================
 // TAB SWITCHING
 // ============================================================
@@ -275,6 +287,9 @@ function showDirect(idx, blk) {
     <div style="margin-top:16px;padding:10px 12px;background:rgba(39,174,96,0.1);border-left:3px solid var(--green);border-radius:0 6px 6px 0;font-size:0.85rem">
       Disk accesses to read this block: <strong>2</strong> (1 inode + 1 data read)
     </div>`;
+  t112Attempts++;
+  t112Checkpoints.direct = true;
+  reportT112();
 }
 
 function showSI(siBlk) {
@@ -300,6 +315,9 @@ function showSI(siBlk) {
     <div style="margin-top:16px;padding:10px 12px;background:rgba(116,185,255,0.1);border-left:3px solid #74b9ff;border-radius:0 6px 6px 0;font-size:0.85rem">
       Disk accesses to read any SI-range block: <strong>3</strong> (1 inode + 1 index block + 1 data read)
     </div>`;
+  t112Attempts++;
+  t112Checkpoints.si = true;
+  reportT112();
 }
 
 function showDI(diBlk) {
@@ -324,6 +342,9 @@ function showDI(diBlk) {
     <div style="margin-top:16px;padding:10px 12px;background:rgba(162,155,254,0.1);border-left:3px solid #a29bfe;border-radius:0 6px 6px 0;font-size:0.85rem">
       Disk accesses for DI block: <strong>4</strong> (1 inode + 1 outer index + 1 inner index + 1 data read)
     </div>`;
+  t112Attempts++;
+  t112Checkpoints.di = true;
+  reportT112();
 }
 
 function showTI(tiBlk) {
@@ -349,6 +370,9 @@ function showTI(tiBlk) {
     <div style="margin-top:16px;padding:10px 12px;background:rgba(255,118,117,0.1);border-left:3px solid #ff7675;border-radius:0 6px 6px 0;font-size:0.85rem">
       Disk accesses for TI block: <strong>5</strong> (1 inode + 3 index reads + 1 data read)
     </div>`;
+  t112Attempts++;
+  t112Checkpoints.ti = true;
+  reportT112();
 }
 
 // ============================================================
@@ -489,12 +513,16 @@ function travRun() {
     <h3>Traversal for offset ${offset.toLocaleString()} bytes</h3>
     <ul class="step-list">${stepsHTML}</ul>
     ${summaryHTML}`;
+  t112Attempts++;
+  t112Checkpoints.traversal = true;
+  reportT112();
 }
 
 // ============================================================
 // INIT
 // ============================================================
 window.onload = () => {
+  if (window.Telemetry) Telemetry.init("11_2", 11);
   buildInodeSlots();
   calcUpdate();
 };

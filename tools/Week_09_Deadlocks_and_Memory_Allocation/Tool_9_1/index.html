@@ -173,9 +173,20 @@
   </div>
 </div>
 
+<script src="../../shared/telemetry.js"></script>
 <script>
 // ===================== UTILS =====================
 function el(id) { return document.getElementById(id); }
+let t91Attempts = 0;
+const t91Checkpoints = { build: false, cycle: false, bankers: false };
+let t91Complete = false;
+
+function reportT91() {
+  if (!window.Telemetry) return;
+  const score = Object.values(t91Checkpoints).filter(Boolean).length;
+  Telemetry.updateProgress(score, 3, t91Attempts);
+  if (!t91Complete && score === 3) { t91Complete = true; Telemetry.markComplete(t91Attempts); }
+}
 
 // ===================== RAG SECTION =====================
 let ragState = { p: 3, r: 2, instances: [1,1], alloc: null, req: null, cycleEdges: [] };
@@ -312,6 +323,9 @@ function drawRAG(highlight) {
 
   el('ragResult').className = 'result info';
   el('ragResult').textContent = 'Graph built. Click Detect Cycle to check for cycles.';
+  t91Attempts++;
+  t91Checkpoints.build = true;
+  reportT91();
 }
 
 function drawArrow(ctx, x1, y1, x2, y2, color, width, label) {
@@ -334,6 +348,9 @@ function drawArrow(ctx, x1, y1, x2, y2, color, width, label) {
 }
 
 function detectCycle() {
+  t91Attempts++;
+  t91Checkpoints.cycle = true;
+  reportT91();
   const p = ragState.p, r = ragState.r;
   const alloc = ragState.alloc || readMatrix('alloc', p, r);
   const req = ragState.req || readMatrix('req', p, r);
@@ -598,6 +615,9 @@ function bankersNextStep() {
 }
 
 function bankersRunAll() {
+  t91Attempts++;
+  t91Checkpoints.bankers = true;
+  reportT91();
   if (bkState.n === 0) return;
   for (let k = 0; k < 100; k++) { if (bkState.done) break; bankersNextStep(); }
 }
@@ -642,6 +662,7 @@ function switchTab(i) {
 
 // ===================== INIT =====================
 buildRagInputs();
+if (window.Telemetry) Telemetry.init("9_1", 9);
 loadBankers('safe3');
 </script>
 </body>

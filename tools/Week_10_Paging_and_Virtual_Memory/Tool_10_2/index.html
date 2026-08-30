@@ -235,6 +235,16 @@ const ANNOTATIONS = [
 
 let faultIdx = 0;
 let faultTimer = null;
+let t102Attempts = 0;
+const t102Checkpoints = { fault: false, ws: false, eat: false };
+let t102Complete = false;
+
+function reportT102() {
+  if (!window.Telemetry) return;
+  const score = Object.values(t102Checkpoints).filter(Boolean).length;
+  Telemetry.updateProgress(score, 3, t102Attempts);
+  if (!t102Complete && score === 3) { t102Complete = true; Telemetry.markComplete(t102Attempts); }
+}
 
 function buildStepCards() {
   const container = document.getElementById('step-cards-container');
@@ -266,7 +276,7 @@ function faultReset() {
 
 function faultStep() {
   if (faultIdx >= STEPS.length) {
-    document.getElementById('fault-annotation').innerHTML = '<span style="color:var(--green)">✓ All 8 steps complete. Process resumed transparently.</span>';
+    document.getElementById('fault-annotation').innerHTML = '✅ All 8 steps complete. Process resumed transparently.';
     return;
   }
   // mark previous done
@@ -280,6 +290,9 @@ function faultStep() {
   document.getElementById('proc-state').innerHTML = s.state;
   document.getElementById('fault-annotation').textContent = 'Timing: ' + ANNOTATIONS[faultIdx];
   faultIdx++;
+  t102Attempts++;
+  if (faultIdx >= STEPS.length) t102Checkpoints.fault = true;
+  reportT102();
 }
 
 function faultPlay() {
@@ -296,12 +309,16 @@ document.getElementById('speed-slider').addEventListener('input', function() {
 });
 
 faultReset();
+if (window.Telemetry) Telemetry.init("10_2", 10);
 
 // ─── EAT CALCULATOR ────────────────────────────────────────────────────────
 function syncPF(v) {
   const p = v / 100000;
   document.getElementById('pf-display').textContent = p.toFixed(7).replace(/0+$/, '0');
   calcEAT2();
+  t102Attempts++;
+  t102Checkpoints.eat = true;
+  reportT102();
 }
 
 function calcEAT2() {
@@ -384,6 +401,9 @@ function wsStep() {
   wsIdx++;
   document.getElementById('ws-t').textContent = wsIdx;
   wsRender();
+  t102Attempts++;
+  if (wsIdx >= wsStream.length) t102Checkpoints.ws = true;
+  reportT102();
 }
 
 function wsPlay() {

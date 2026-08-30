@@ -220,6 +220,7 @@ function toggleExplain(){
 }
 </script>
 
+<script src="../../shared/telemetry.js"></script>
 <script>
 // === State ===
 let N=5, numP=2, numC=2, mode='normal';
@@ -229,6 +230,15 @@ let producers=[], consumers=[];
 let running=false, timer=null, tick=0;
 let deadlocked=false;
 const SPEEDS=[null,800,400,150];
+let t81Attempts=0;
+const t81ModesRun=new Set();
+let t81Complete=false;
+
+function reportT81(){
+  if(!window.Telemetry) return;
+  Telemetry.updateProgress(t81ModesRun.size,4,t81Attempts);
+  if(!t81Complete && t81ModesRun.size===4){ t81Complete=true; Telemetry.markComplete(t81Attempts); }
+}
 
 function getSpeed(){ return SPEEDS[+document.getElementById('rangeSpeed').value]; }
 
@@ -267,7 +277,12 @@ function setMode(m){
 
 function togglePlay(){
   if(running){ clearInterval(timer); running=false; document.getElementById('btnPlay').textContent='▶ Play'; }
-  else { running=true; document.getElementById('btnPlay').textContent='⏸ Pause'; timer=setInterval(step,getSpeed()); }
+  else {
+    running=true; document.getElementById('btnPlay').textContent='⏸ Pause'; timer=setInterval(step,getSpeed());
+    t81Attempts++;
+    t81ModesRun.add(mode);
+    reportT81();
+  }
 }
 
 function log(msg,cls=''){
@@ -438,6 +453,7 @@ function render(){
 }
 
 // Init
+if (window.Telemetry) Telemetry.init("8_1", 8);
 resetSim();
 </script>
 </body>

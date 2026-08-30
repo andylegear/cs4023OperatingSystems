@@ -193,7 +193,18 @@
   <div id="cu-result" style="margin-top:12px;"></div>
 </div>
 
+<script src="../../shared/telemetry.js"></script>
 <script>
+let t121Attempts = 0;
+const t121Checkpoints = { single: false, compare: false, custom: false };
+let t121Complete = false;
+
+function reportT121() {
+  if (!window.Telemetry) return;
+  const score = Object.values(t121Checkpoints).filter(Boolean).length;
+  Telemetry.updateProgress(score, 3, t121Attempts);
+  if (!t121Complete && score === 3) { t121Complete = true; Telemetry.markComplete(t121Attempts); }
+}
 const ALGO_NOTES = {
   fcfs: 'FCFS serves requests in arrival order. Simple but can result in large total head movement (\"disk thrashing\"). No starvation risk — every request is eventually served.',
   sstf: 'SSTF always picks the request closest to the current head position. Minimises average seek time but can cause starvation: requests far from the head may never be served if closer requests keep arriving.',
@@ -369,6 +380,9 @@ let sInterval = null;
 function singleStart() {
   if (sInterval) { clearInterval(sInterval); sInterval = null; return; }
   if (!sState || sState.stepIdx > 0) singlePrepare();
+  t121Attempts++;
+  t121Checkpoints.single = true;
+  reportT121();
   const speed = parseInt(document.getElementById('s-speed').value);
   sInterval = setInterval(() => {
     if (sState.stepIdx >= sState.steps.length) { clearInterval(sInterval); sInterval = null; return; }
@@ -384,6 +398,9 @@ function compareReset() {
 }
 
 function compareRun() {
+  t121Attempts++;
+  t121Checkpoints.compare = true;
+  reportT121();
   const head = parseInt(document.getElementById('c-head').value);
   const reqs = parseReqs(document.getElementById('c-reqs').value);
   const algos = ['fcfs','sstf','scan','cscan'];
@@ -437,6 +454,9 @@ function customRun() {
 }
 
 function customAll() {
+  t121Attempts++;
+  t121Checkpoints.custom = true;
+  reportT121();
   const head = parseInt(document.getElementById('cu-head').value);
   const reqs = parseReqs(document.getElementById('cu-reqs').value);
   const dir = document.getElementById('cu-dir').value;
@@ -466,7 +486,7 @@ function switchTab(id) {
 }
 
 // Init
-window.addEventListener('load', () => { singleReset(); });
+window.addEventListener('load', () => { if (window.Telemetry) Telemetry.init("12_1", 12); singleReset(); });
 </script>
 </body>
 </html>

@@ -237,6 +237,7 @@
   </div>
 </div>
 
+<script src="../../shared/telemetry.js"></script>
 <script>
 // ─── SHARED STATE ──────────────────────────────────────────────────────────
 const NUM_PT_ENTRIES = 16;
@@ -297,6 +298,19 @@ function updateOverheadPanel() {
 
 buildPageTable();
 
+if (window.Telemetry) Telemetry.init("10_1", 10);
+
+let t101Attempts = 0;
+const t101Checkpoints = { translate: false, animate: false, tlbRandom: false };
+let t101Complete = false;
+
+function reportT101() {
+  if (!window.Telemetry) return;
+  const score = Object.values(t101Checkpoints).filter(Boolean).length;
+  Telemetry.updateProgress(score, 3, t101Attempts);
+  if (!t101Complete && score === 3) { t101Complete = true; Telemetry.markComplete(t101Attempts); }
+}
+
 // ─── DECOMPOSE / TRANSLATE ─────────────────────────────────────────────────
 function parseVA() {
   const raw = document.getElementById('va-input').value.trim();
@@ -354,6 +368,9 @@ function doTranslate() {
     Physical = (${pte.frame} &lt;&lt; ${currentOffBits}) | ${currentOffset}<br>
     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = <strong>0x${phys.toString(16).toUpperCase()}</strong> = ${phys} decimal
   `;
+  t101Attempts++;
+  t101Checkpoints.translate = true;
+  reportT101();
 }
 
 // ─── STEP ANIMATION ────────────────────────────────────────────────────────
@@ -369,6 +386,9 @@ function nextStep() {
   if (stepIndex < STEPS_TMPL.length) {
     document.getElementById('step-' + stepIndex).classList.add('active');
     stepIndex++;
+    t101Attempts++;
+    if (stepIndex === STEPS_TMPL.length) { t101Checkpoints.animate = true; }
+    reportT101();
   }
 }
 function resetSteps() { stepIndex = 0; document.querySelectorAll('.step-list li').forEach(l => l.classList.remove('active')); }
@@ -469,6 +489,9 @@ function tlbPlay() {
 }
 
 function tlbRandom() {
+  t101Attempts++;
+  t101Checkpoints.tlbRandom = true;
+  reportT101();
   const hot = [3, 7, 4]; const warm = [12, 5, 9]; const cold = [1, 2, 6, 8, 11];
   let s = [];
   for (let i = 0; i < 20; i++) {

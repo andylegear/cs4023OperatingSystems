@@ -320,7 +320,12 @@ function switchTab(name) {
   });
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
-  if (name === 'belady') beladyUpdate();
+  if (name === 'belady') {
+    beladyUpdate();
+    t111Attempts++;
+    t111Checkpoints.belady = true;
+    reportT111();
+  }
 }
 
 // ============================================================
@@ -426,6 +431,9 @@ function racerStep() {
     racerPause();
     document.getElementById('step-info').textContent =
       `Done! FIFO: ${fifoFaults} faults | LRU: ${lruFaults} faults | Clock: ${clkFaults} faults`;
+    t111Attempts++;
+    t111Checkpoints.racer = true;
+    reportT111();
   }
 }
 
@@ -548,12 +556,16 @@ function byoRun() {
 
   html += '</div>';
   document.getElementById('byo-results').innerHTML = html;
+  t111Attempts++;
+  t111Checkpoints.byo = true;
+  reportT111();
 }
 
 // ============================================================
 // INIT
 // ============================================================
 window.onload = () => {
+  if (window.Telemetry) Telemetry.init("11_1", 11);
   racerInit();
   beladyUpdate();
 };

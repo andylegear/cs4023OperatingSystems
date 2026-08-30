@@ -120,8 +120,7 @@
   </div>
   <div class="scenarios" id="scenarios"></div>
 </div>
-
-<script>
+<script src="../../shared/telemetry.js"></script><script>
 // ─── Stack Builder ─────────────────────────────────────────────────────────────
 
 const STACKS = [
@@ -143,6 +142,18 @@ const TILE_COLORS = {
 };
 
 const ALL_TILES = ['Hardware','Host OS','Host OS Kernel','Hypervisor (Type 1)','Hypervisor (Type 2)','Guest OS','Container Runtime','Container Image','Application'];
+
+let t122Attempts = 0;
+let t122StackCorrect = 0;
+let t122ClassifyCorrect = 0;
+let t122Complete = false;
+
+function reportT122() {
+  if (!window.Telemetry) return;
+  const score = t122StackCorrect + nsMatched.size + t122ClassifyCorrect;
+  Telemetry.updateProgress(score, 29, t122Attempts);
+  if (!t122Complete && score === 29) { t122Complete = true; Telemetry.markComplete(t122Attempts); }
+}
 
 function buildStackUI() {
   const bank = document.getElementById('tile-bank');
@@ -210,6 +221,9 @@ function stackCheck() {
   document.getElementById('stack-compare').innerHTML =
     `<div style="padding:8px; background:var(--navy2); border-radius:4px; font-size:0.82rem;">Score: <strong style="color:var(--accent)">${correct}/${total}</strong>. ${correct===total ? '✅ All correct!' : 'Incorrect slots are red — check the expected order: Hardware → OS layers → App.'}</div>`;
   document.getElementById('stack-compare').style.display = 'block';
+  t122Attempts++;
+  t122StackCorrect = correct;
+  reportT122();
 }
 
 function stackReset() { buildStackUI(); document.getElementById('stack-compare').style.display='none'; }
@@ -286,6 +300,7 @@ function nsClickLeft(el, ns) {
 function nsClickRight(el, desc) {
   if (!nsSelectedLeft) return;
   if (el.classList.contains('matched')) return;
+  t122Attempts++;
   const correct = nsCorrectMatches[nsSelectedLeft];
   if (desc === correct) {
     el.classList.add('matched');
@@ -304,6 +319,7 @@ function nsClickRight(el, desc) {
   }
   nsSelectedLeft = null;
   document.querySelectorAll('#ns-left .match-item').forEach(e => e.classList.remove('selected'));
+  reportT122();
 }
 
 function nsReset() { buildNS(); }
@@ -361,6 +377,9 @@ function classifyCheckAll() {
     else { card.classList.add('wrong'); card.classList.remove('correct'); fb.innerHTML = `<span style="color:var(--red)">✗ Expected: ${s.answer} — ${s.explain}</span>`; }
   });
   document.getElementById('classify-score').textContent = `Score: ${correct} / ${SCENARIOS.length}`;
+  t122Attempts++;
+  t122ClassifyCorrect = correct;
+  reportT122();
 }
 
 function classifyReset() { buildClassify(); }
@@ -376,6 +395,7 @@ function switchTab(id) {
 }
 
 window.addEventListener('load', () => {
+  if (window.Telemetry) Telemetry.init("12_2", 12);
   buildStackUI();
   buildNS();
   buildClassify();

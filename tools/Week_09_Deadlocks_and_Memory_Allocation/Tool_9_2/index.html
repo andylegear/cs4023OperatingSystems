@@ -185,6 +185,7 @@ Step 6: allocate P4 (size 90)  ← WHICH ALGORITHM SUCCEEDS?</pre>
   </div>
 </div>
 
+<script src="../../shared/telemetry.js"></script>
 <script>
 function el(id) { return document.getElementById(id); }
 
@@ -204,6 +205,16 @@ function freshState() {
 
 let states = { FF: freshState(), BF: freshState(), WF: freshState() };
 let processColours = {};
+let t92Actions = 0;
+const t92Checkpoints = { actions: false, challenge: false };
+let t92Complete = false;
+
+function reportT92() {
+  if (!window.Telemetry) return;
+  const score = Object.values(t92Checkpoints).filter(Boolean).length;
+  Telemetry.updateProgress(score, 2, t92Actions);
+  if (!t92Complete && score === 2) { t92Complete = true; Telemetry.markComplete(t92Actions); }
+}
 
 function allocate() {
   const name = el('procName').value.trim() || 'P?';
@@ -229,6 +240,9 @@ function allocate() {
   const anyFail = Object.values(results).some(r => !r);
   setResult(anyFail ? 'err' : 'ok', `Allocate ${name}(${size}) → ${msgs.join('  |  ')}`);
   renderAll();
+  t92Actions++;
+  if (t92Actions >= 3) t92Checkpoints.actions = true;
+  reportT92();
 }
 
 function allocateInState(segs, name, size, colour, algo) {
@@ -265,6 +279,9 @@ function deallocate() {
   el('deallocModal').classList.add('hidden');
   setResult('info', `Freed ${name} in all three algorithms. Adjacent free holes coalesced.`);
   renderAll();
+  t92Actions++;
+  if (t92Actions >= 3) t92Checkpoints.actions = true;
+  reportT92();
 }
 
 function freeProcess(segs, name) {
@@ -369,10 +386,12 @@ function checkChallenge() {
   if (correct) {
     res.className = 'result ok';
     res.innerHTML = `✅ <strong>Correct!</strong> All three algorithms FAIL — neither the 80-unit hole nor the 60-unit hole is large enough for P4 (90 units). Total free = 140 units, but it is split into non-contiguous holes. External fragmentation prevents allocation. <strong>Compaction</strong> would merge the holes into a single 140-unit block, allowing P4 to fit.`;
+    t92Checkpoints.challenge = true;
   } else {
     res.className = 'result err';
     res.innerHTML = `❌ Not quite. <strong>All algorithms fail here</strong> — P4 needs 90 units but the two free holes are 80 and 60 (neither is large enough). Total free = 140 but it is fragmented. <em>This is classic external fragmentation.</em>`;
   }
+  reportT92();
 }
 
 function runChallenge() {
@@ -420,6 +439,7 @@ function switchTab(i) {
 }
 
 // Init
+if (window.Telemetry) Telemetry.init("9_2", 9);
 renderAll();
 </script>
 </body>

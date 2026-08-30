@@ -97,8 +97,7 @@
   <p class="instr">Click any concept to reveal where it appears in AI and cloud systems.</p>
   <div class="concept-grid" id="conceptGrid"></div>
 </div>
-
-<script>
+<script src="../../shared/telemetry.js"></script><script>
 // ── TAB 0: eBPF Probe Matcher ─────────────────────────────────────────────────
 const PROBES = [
   ['kprobe',       'Kernel function entry — instruments any non-inlined kernel function'],
@@ -111,6 +110,18 @@ const PROBES = [
   ['LSM hook',     'Linux Security Module — security policy enforcement points'],
 ];
 let selProbe = null, matchedProbes = new Set();
+let t132Attempts = 0;
+let t132GpuCorrect = 0;
+let t132ConceptsOpened = new Set();
+let t132Complete = false;
+
+function reportT132() {
+  if (!window.Telemetry) return;
+  const conceptScore = t132ConceptsOpened.size >= 3 ? 1 : 0;
+  const score = matchedProbes.size + t132GpuCorrect + conceptScore;
+  Telemetry.updateProgress(score, 15, t132Attempts);
+  if (!t132Complete && score === 15) { t132Complete = true; Telemetry.markComplete(t132Attempts); }
+}
 
 function buildEbpf() {
   selProbe = null; matchedProbes.clear();
@@ -143,6 +154,7 @@ function handleEbpf(el) {
     selEbpfDesc = el;
   }
   if (selEbpfName && selEbpfDesc) {
+    t132Attempts++;
     const pair = PROBES.find(p => p[0] === selEbpfName.dataset.val);
     if (pair && pair[1] === selEbpfDesc.dataset.val) {
       selEbpfName.classList.replace('selected','correct');
@@ -157,6 +169,7 @@ function handleEbpf(el) {
       setTimeout(() => { selEbpfName.classList.remove('wrong','selected'); selEbpfDesc.classList.remove('wrong'); }, 700);
     }
     selEbpfName = null; selEbpfDesc = null;
+    reportT132();
   }
 }
 
@@ -236,6 +249,9 @@ function checkGpu() {
     exp.classList.add('show');
   });
   document.getElementById('gpuScore').textContent = `Score: ${right} / ${GPU_SCENARIOS.length} — green = correct answer`;
+  t132Attempts++;
+  t132GpuCorrect = right;
+  reportT132();
 }
 
 // ── TAB 2: Module Concept Map ─────────────────────────────────────────────────
@@ -260,7 +276,7 @@ function buildConceptMap() {
     card.className = 'concept-card';
     const tags = c.tags.map(t => `<span class="concept-tag">${t}</span>`).join('');
     card.innerHTML = `<h3>${c.name}</h3><div class="concept-desc">${c.desc}<div style="margin-top:.4rem">${tags}</div></div>`;
-    card.onclick = () => card.classList.toggle('open');
+    card.onclick = () => { card.classList.toggle('open'); t132ConceptsOpened.add(c.name); reportT132(); };
     grid.appendChild(card);
   });
 }
@@ -271,6 +287,7 @@ function showTab(idx) {
   document.querySelectorAll('.panel').forEach((p,i) => p.classList.toggle('active', i===idx));
 }
 
+if (window.Telemetry) Telemetry.init("13_2", 13);
 buildEbpf();
 buildGpu();
 buildConceptMap();

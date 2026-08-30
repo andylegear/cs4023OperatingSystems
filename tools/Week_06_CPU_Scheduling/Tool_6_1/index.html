@@ -138,6 +138,7 @@
 
 </div>
 
+<script src="../../shared/telemetry.js"></script>
 <script>
 // ── Process colours ─────────────────────────────────────
 const COLORS = ['#4a90d9','#e8734a','#6abf69','#9c6bca','#e8b84a','#4ab8b8'];
@@ -423,6 +424,8 @@ function renderTestInputs(procs) {
   });
 }
 
+let checkCount = 0;
+
 function checkAnswers() {
   const procs = getProcesses();
   let totalWait = 0, totalTat = 0;
@@ -436,6 +439,16 @@ function checkAnswers() {
   const avgT = totalTat / procs.length;
   setBadge('avg-wait-badge', document.getElementById('avg-wait-input').value, avgW, true);
   setBadge('avg-tat-badge',  document.getElementById('avg-tat-input').value,  avgT, true);
+
+  checkCount++;
+  if (window.Telemetry) {
+    const total = procs.length * 2 + 2;
+    const correct = document.querySelectorAll('#wait-inputs .badge-correct, #tat-inputs .badge-correct').length +
+      (document.getElementById('avg-wait-badge').classList.contains('badge-correct') ? 1 : 0) +
+      (document.getElementById('avg-tat-badge').classList.contains('badge-correct') ? 1 : 0);
+    Telemetry.updateProgress(correct, total, checkCount);
+    if (correct === total) Telemetry.markComplete(checkCount);
+  }
 }
 
 function setBadge(id, userVal, correct, isFloat=false) {
@@ -476,6 +489,7 @@ function toggleWorking() {
 }
 
 // ── Init ──────────────────────────────────────────────────
+if (window.Telemetry) Telemetry.init("6_1", 6);
 loadDefault();
 updateAlgoDesc();
 </script>
