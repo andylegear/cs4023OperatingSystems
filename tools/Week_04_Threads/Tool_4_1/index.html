@@ -92,6 +92,7 @@
 </style>
 </head>
 <body>
+<script src="../../shared/telemetry.js"></script>
 <header>
   <h1>CS4023 – Tool 4.1: Thread vs Process Memory Explorer</h1>
   <p>Click any memory region to learn whether it is SHARED or PRIVATE. Then try the classification challenge.</p>
@@ -321,6 +322,8 @@ function checkChallenge() {
   });
   document.getElementById('scoreDisplay').textContent = `Score: ${correct} / ${statements.length}`;
   checked = true;
+  if (window.Telemetry) Telemetry.updateProgress(correct, statements.length);
+  if (correct === statements.length && window.Telemetry) Telemetry.markComplete();
 }
 
 function resetChallenge() {
@@ -347,6 +350,7 @@ function reviewAnswers() {
 }
 
 buildCards();
+Telemetry.init("4_1", 4);
 </script>
 </body>
 </html>

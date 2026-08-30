@@ -61,6 +61,7 @@
 </style>
 </head>
 <body>
+<script src="../../shared/telemetry.js"></script>
 
 <header>
   <h1>🎮 Tool 3.1 — Process State Machine</h1>
@@ -374,6 +375,11 @@ function showFinal() {
               '🔄 Keep practising — review the lecture slides and try again.';
   document.getElementById('finalMsg').textContent = msg;
   document.getElementById('finalScreen').classList.add('active');
+  if (window.Telemetry) {
+    const attemptsTotal = Object.values(attemptMap).reduce((a, b) => a + b, 0);
+    Telemetry.updateProgress(score, maxScore);
+    Telemetry.markComplete(attemptsTotal);
+  }
 }
 
 function resetGame() {
@@ -391,6 +397,7 @@ function resetGame() {
 }
 
 drawSvg();
+Telemetry.init("3_1", 3);
 </script>
 </body>
 </html>

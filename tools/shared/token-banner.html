@@ -1,0 +1,47 @@
+<!--
+  token-banner.html — shared study-token banner fragment for CS4023 active
+  learning tools. Include the markup, then call TelemetryBanner.init() after
+  Telemetry.init(...) so the token is available.
+-->
+<div id="cs4023-token-banner" style="
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 9999;
+  background: #1e293b; color: #e2e8f0; font: 13px/1.4 system-ui, sans-serif;
+  padding: 8px 14px; display: flex; align-items: center; gap: 10px;
+  flex-wrap: wrap; box-shadow: 0 -2px 6px rgba(0,0,0,0.2);
+">
+  <span>Study token (paste into the consent form):</span>
+  <code id="cs4023-token-value" style="background:#0f172a; padding:2px 8px; border-radius:4px;">…</code>
+  <button id="cs4023-token-copy" style="
+    background:#334155; color:#e2e8f0; border:1px solid #475569; border-radius:4px;
+    padding:3px 10px; cursor:pointer; font-size:12px;
+  ">Copy</button>
+  <span id="cs4023-token-copied" style="color:#4ade80; display:none;">Copied!</span>
+</div>
+<script>
+(function () {
+  "use strict";
+  function init() {
+    var valueEl = document.getElementById("cs4023-token-value");
+    var copyBtn = document.getElementById("cs4023-token-copy");
+    var copiedEl = document.getElementById("cs4023-token-copied");
+    if (!valueEl || !window.Telemetry) return;
+
+    var token = window.Telemetry.getToken();
+    valueEl.textContent = token || "(unavailable)";
+
+    if (copyBtn) {
+      copyBtn.addEventListener("click", function () {
+        if (navigator.clipboard && token) {
+          navigator.clipboard.writeText(token).then(function () {
+            if (copiedEl) {
+              copiedEl.style.display = "inline";
+              setTimeout(function () { copiedEl.style.display = "none"; }, 1500);
+            }
+          });
+        }
+      });
+    }
+  }
+  window.TelemetryBanner = { init: init };
+})();
+</script>

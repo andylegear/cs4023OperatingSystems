@@ -74,6 +74,7 @@
 </style>
 </head>
 <body>
+<script src="../../shared/telemetry.js"></script>
 <header>
   <h1>CS4023 – Tool 4.2: pthread API Matcher</h1>
   <p>Three activities: match API functions → spot bugs → complete a pthreads program</p>
@@ -314,6 +315,8 @@ function checkAll() {
   selectedFn = null; selectedDesc = null;
   const total = Object.keys(pairs).length;
   document.getElementById('matchScore').textContent = `${correct} / ${fns.length} matched`;
+  if (window.Telemetry) Telemetry.updateProgress(correct, fns.length);
+  if (correct === fns.length && window.Telemetry) Telemetry.markComplete();
   Object.keys(pairs).forEach(k => delete pairs[k]);
 }
 function showAllAnswers() {
@@ -493,6 +496,7 @@ function switchTab(idx) {
 // INIT
 buildMatcher();
 buildFillCode();
+Telemetry.init("4_2", 4);
 </script>
 </body>
 </html>

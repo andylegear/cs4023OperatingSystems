@@ -105,6 +105,7 @@
 </style>
 </head>
 <body>
+<script src="../../shared/telemetry.js"></script>
 
 <header>
   <h1>🖥️ OS Function Classifier — CS4023</h1>
@@ -250,6 +251,8 @@ function handleDrop(zoneCat) {
     score++;
     updateScore();
     el.classList.add('placed-correct');
+    if (window.Telemetry) Telemetry.updateProgress(score, CARDS.length);
+    if (score === CARDS.length && window.Telemetry) Telemetry.markComplete();
   } else {
     el.classList.add('placed-wrong');
   }
@@ -377,6 +380,7 @@ document.getElementById('btn-reset').addEventListener('click', build);
 
 // ── Init ──
 build();
+Telemetry.init("1_1", 1);
 </script>
 </body>
 </html>

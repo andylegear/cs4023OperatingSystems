@@ -69,6 +69,7 @@
 </style>
 </head>
 <body>
+<script src="../../shared/telemetry.js"></script>
 <header>
   <div>
     <h1>🔀 Tool 3.2 — Fork/Exec Visualiser</h1>
@@ -265,6 +266,10 @@ function doStep() {
   if (currentStep >= steps.length) {
     // Show quiz
     showQuiz();
+    if (window.Telemetry) {
+      Telemetry.updateProgress(currentStep + 1, steps.length);
+      Telemetry.markComplete();
+    }
     clearInterval(autoTimer);
     autoTimer = null;
     document.getElementById('autoBtn').textContent = '⏱ Auto';
@@ -427,6 +432,7 @@ function resetScenario() {
 
 // Init
 loadScenario();
+Telemetry.init("3_2", 3);
 </script>
 </body>
 </html>

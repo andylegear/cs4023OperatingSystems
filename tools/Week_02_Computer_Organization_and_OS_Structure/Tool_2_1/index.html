@@ -157,6 +157,7 @@
 </style>
 </head>
 <body>
+<script src="../../shared/telemetry.js"></script>
 
 <h1>CS4023 – Tool 2.1: Hardware Interrupt Simulator</h1>
 <p class="subtitle">Step through the sequence of events when a hardware interrupt is raised.</p>
@@ -373,6 +374,10 @@ function checkQuiz() {
     }
   });
   document.getElementById('quiz-score').textContent = `Score: ${score} / 3`;
+  if (window.Telemetry) {
+    Telemetry.updateProgress(score, 3);
+    Telemetry.markComplete();
+  }
 }
 
 function resetQuiz() {
@@ -380,6 +385,7 @@ function resetQuiz() {
   document.querySelectorAll('.q label').forEach(l => l.classList.remove('correct','wrong'));
   document.getElementById('quiz-score').textContent = '';
 }
+Telemetry.init("2_1", 2);
 </script>
 </body>
 </html>

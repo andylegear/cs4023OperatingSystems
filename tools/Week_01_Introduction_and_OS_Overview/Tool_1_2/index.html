@@ -138,6 +138,7 @@
 </style>
 </head>
 <body>
+<script src="../../shared/telemetry.js"></script>
 
 <header>
   <h1>📅 OS Timeline Explorer — CS4023</h1>
@@ -386,6 +387,8 @@ function checkAnswers() {
     }
   });
   document.getElementById('ch-score').textContent = correct;
+  if (window.Telemetry) Telemetry.updateProgress(correct, CHALLENGE.length);
+  if (correct === CHALLENGE.length && window.Telemetry) Telemetry.markComplete();
 }
 
 function resetChallenge() {
@@ -455,6 +458,7 @@ function positionGhost(touch) {
 
 // ── Init ──
 buildChallenge();
+Telemetry.init("1_2", 1);
 </script>
 </body>
 </html>

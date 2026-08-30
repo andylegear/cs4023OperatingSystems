@@ -199,6 +199,7 @@
 </style>
 </head>
 <body>
+<script src="../../shared/telemetry.js"></script>
 
 <h1>CS4023 – Tool 2.2: System Call Flow Animator</h1>
 <p class="subtitle">Trace the journey of a system call from user space into the kernel and back.</p>
@@ -609,6 +610,10 @@ function checkOrder() {
     else item.classList.add('wrong-pos');
   });
   document.getElementById('quiz-score').textContent = `Score: ${score} / 4`;
+  if (window.Telemetry) {
+    Telemetry.updateProgress(score, 4);
+    Telemetry.markComplete();
+  }
 }
 
 function resetQuiz() {
@@ -617,6 +622,7 @@ function resetQuiz() {
 
 // Init
 loadSyscall();
+Telemetry.init("2_2", 2);
 </script>
 </body>
 </html>
