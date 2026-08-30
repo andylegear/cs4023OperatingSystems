@@ -11,6 +11,10 @@
  * Sends anon INSERT-only events to Supabase (tool_telemetry_events table).
  * The publishable key below is safe to embed client-side: RLS only allows
  * inserts, never reads, for the anon/publishable role.
+ *
+ * Every event also carries device_type ("mobile"|"tablet"|"desktop"),
+ * viewport_width, viewport_height, is_touch — requires matching columns
+ * on tool_telemetry_events (see build_public.ps1 / repo docs).
  */
 (function (global) {
   "use strict";
@@ -32,6 +36,25 @@
   let idle = false;
   let heartbeatTimer = null;
   let secondsTimer = null;
+  let deviceInfo = null;
+
+  // Coarse device classification so completion rates can be compared across screen sizes.
+  function classifyDevice() {
+    const w = window.innerWidth || document.documentElement.clientWidth || 0;
+    const h = window.innerHeight || document.documentElement.clientHeight || 0;
+    const isTouch = "ontouchstart" in window || (navigator.maxTouchPoints || 0) > 0;
+    const coarsePointer = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+    let deviceType;
+    if (w < 768) deviceType = "mobile";
+    else if (w < 1024 && (isTouch || coarsePointer)) deviceType = "tablet";
+    else deviceType = "desktop";
+    return {
+      device_type: deviceType,
+      viewport_width: w,
+      viewport_height: h,
+      is_touch: !!(isTouch || coarsePointer),
+    };
+  }
 
   function getOrCreateToken() {
     let token = null;
@@ -59,6 +82,7 @@
         week: week,
         event_type: eventType,
       },
+      deviceInfo || {},
       extra || {}
     );
 
@@ -120,6 +144,11 @@
     toolId = newToolId;
     week = newWeek;
     studyToken = getOrCreateToken();
+    deviceInfo = classifyDevice();
+
+    window.addEventListener("resize", function () {
+      deviceInfo = classifyDevice();
+    });
 
     ["mousemove", "keydown", "click", "touchstart", "scroll"].forEach(function (evt) {
       document.addEventListener(evt, markActivity, { passive: true });
