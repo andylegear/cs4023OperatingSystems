@@ -1,0 +1,10 @@
+import{E as e,R as t,S as n,X as r,_ as i,_t as a,g as o,ht as s,x as c}from"./modules/shiki-Dm5aQrj-.js";import{nt as l,rt as u}from"./index-C_eg0dhf.js";import{t as d}from"./default-DAhEsQQa.js";import{t as f}from"./slidev/CodeBlockWrapper-vO2PntbL.js";var p={__name:`L02_1_Computer_System_Organization.md__slidev_11`,setup(p){let{$slidev:m,$nav:h,$clicksContext:g,$clicks:_,$page:v,$renderContext:y,$frontmatter:b}=u();return g.setup(),(u,p)=>{let m=f;return t(),i(d,a(e(s(l)(s(b),10))),{default:r(()=>[p[1]||=o(`h1`,null,`I/O Method 3: Direct Memory Access (DMA)`,-1),p[2]||=o(`p`,null,[c(`For `),o(`strong`,null,`large transfers`),c(`, the DMA controller moves data directly between device and RAM — `),o(`strong`,null,`without CPU involvement per byte`),c(`.`)],-1),n(m,{title:``,ranges:[]},{default:r(()=>[...p[0]||=[o(`pre`,{class:`shiki shiki-themes vitesse-dark vitesse-light slidev-code`,style:{"--shiki-dark":`#dbd7caee`,"--shiki-light":`#393a34`,"--shiki-dark-bg":`#121212`,"--shiki-light-bg":`#ffffff`}},[o(`code`,{class:`language-text`},[o(`span`,{class:`line`},[o(`span`,null,`Without DMA:  [Device] → CPU copies each byte → [RAM]`)]),c(`
+`),o(`span`,{class:`line`},[o(`span`,null,`              CPU occupied for entire transfer`)]),c(`
+`),o(`span`,{class:`line`},[o(`span`)]),c(`
+`),o(`span`,{class:`line`},[o(`span`,null,`With DMA:     CPU programs DMA controller:`)]),c(`
+`),o(`span`,{class:`line`},[o(`span`,null,`              → source address (device buffer)`)]),c(`
+`),o(`span`,{class:`line`},[o(`span`,null,`              → destination (RAM address)`)]),c(`
+`),o(`span`,{class:`line`},[o(`span`,null,`              → byte count`)]),c(`
+`),o(`span`,{class:`line`},[o(`span`,null,`              CPU is FREE during transfer`)]),c(`
+`),o(`span`,{class:`line`},[o(`span`,null,`              DMA controller moves data autonomously`)]),c(`
+`),o(`span`,{class:`line`},[o(`span`,null,`              → DMA interrupts CPU when transfer complete`)])])],-1)]]),_:1}),p[3]||=o(`p`,null,[o(`strong`,null,`Used by`),c(`: disk controllers (SATA/NVMe), network cards, USB, GPU command queues.`)],-1)]),_:1},16)}}};export{p as default};
