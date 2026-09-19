@@ -189,11 +189,13 @@ function drawSvg() {
     const dist = Math.sqrt(dx*dx + dy*dy);
     const ux = dx/dist, uy = dy/dist;
 
-    // Arched control points for edges that would otherwise cut straight through another node
+    // Arched control points for edges that would otherwise cut straight through another node.
+    // Waiting->Ready sweeps high above the whole diagram; New->Terminated dips low below it,
+    // so the two long-distance curves never cross each other or hug the same nodes.
     const curveControlPoints = {
       'Running->Ready':   { x: (from.x + to.x) / 2, y: from.y - 60 },
-      'Waiting->Ready':    { x: (from.x + to.x) / 2, y: from.y - 150 },
-      'New->Terminated':   { x: 460, y: 95 },
+      'Waiting->Ready':    { x: (from.x + to.x) / 2, y: 20 },
+      'New->Terminated':   { x: 300, y: 470 },
     };
     const cp = curveControlPoints[key];
     let sx = from.x + ux * R, sy = from.y + uy * R;
