@@ -189,20 +189,25 @@ function drawSvg() {
     const dist = Math.sqrt(dx*dx + dy*dy);
     const ux = dx/dist, uy = dy/dist;
 
-    // Perpendicular for curved edges between same-row nodes
-    const isCurved = (t.from === 'Running' && t.to === 'Ready');
+    // Arched control points for edges that would otherwise cut straight through another node
+    const curveControlPoints = {
+      'Running->Ready':   { x: (from.x + to.x) / 2, y: from.y - 60 },
+      'Waiting->Ready':    { x: (from.x + to.x) / 2, y: from.y - 150 },
+      'New->Terminated':   { x: 460, y: 95 },
+    };
+    const cp = curveControlPoints[key];
     let sx = from.x + ux * R, sy = from.y + uy * R;
     let ex = to.x - ux * R, ey = to.y - uy * R;
 
     let pathD;
-    if (isCurved) {
-      const cx1 = (from.x + to.x) / 2, cy1 = from.y - 60;
-      pathD = `M${sx},${sy} Q${cx1},${cy1} ${ex},${ey}`;
-      // Recompute endpoint tangent for curved
-      const tx = ex - cx1, ty = ey - cy1;
-      const tl = Math.sqrt(tx*tx+ty*ty);
-      ex = to.x - (tx/tl)*R; ey = to.y - (ty/tl)*R;
-      pathD = `M${from.x + (cx1-from.x)/Math.sqrt((cx1-from.x)**2+(cy1-from.y)**2)*R},${from.y + (cy1-from.y)/Math.sqrt((cx1-from.x)**2+(cy1-from.y)**2)*R} Q${cx1},${cy1} ${ex},${ey}`;
+    if (cp) {
+      const startLen = Math.hypot(cp.x - from.x, cp.y - from.y);
+      const endLen = Math.hypot(to.x - cp.x, to.y - cp.y);
+      sx = from.x + (cp.x - from.x) / startLen * R;
+      sy = from.y + (cp.y - from.y) / startLen * R;
+      ex = to.x - (to.x - cp.x) / endLen * R;
+      ey = to.y - (to.y - cp.y) / endLen * R;
+      pathD = `M${sx},${sy} Q${cp.x},${cp.y} ${ex},${ey}`;
     } else {
       pathD = `M${sx},${sy} L${ex},${ey}`;
     }
@@ -218,8 +223,8 @@ function drawSvg() {
 
     // Event label on revealed edges
     if (isRevealed) {
-      const lx = (from.x + to.x) / 2;
-      const ly = isCurved ? from.y - 35 : (from.y + to.y) / 2 - 10;
+      const lx = cp ? (from.x + to.x + 2*cp.x) / 4 : (from.x + to.x) / 2;
+      const ly = cp ? (from.y + to.y + 2*cp.y) / 4 - 6 : (from.y + to.y) / 2 - 10;
       const labelEl = document.createElementNS('http://www.w3.org/2000/svg','text');
       labelEl.setAttribute('x', lx);
       labelEl.setAttribute('y', ly);
