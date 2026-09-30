@@ -1,0 +1,12 @@
+import{E as e,R as t,S as n,X as r,_ as i,_t as a,g as o,ht as s,x as c}from"./modules/shiki-Dm5aQrj-.js";import{nt as l,rt as u}from"./index-BUlZNt_n.js";import{t as d}from"./slidev/CodeBlockWrapper-BL15Qj1E.js";import{t as f}from"./default-B0E8JRSb.js";var p={__name:`L12_1_IO_Systems_Hardware_Drivers_and_Buffering.md__slidev_12`,setup(p){let{$slidev:m,$nav:h,$clicksContext:g,$clicks:_,$page:v,$renderContext:y,$frontmatter:b}=u();return g.setup(),(u,p)=>{let m=d;return t(),i(f,a(e(s(l)(s(b),11))),{default:r(()=>[p[1]||=o(`h1`,null,`Worked Example — SCAN Disk Scheduling`,-1),p[2]||=o(`p`,null,[o(`strong`,null,`Head position:`),c(` 50, moving toward higher cylinders.`),o(`br`),o(`strong`,null,`Requests:`),c(` 82, 170, 43, 140, 24, 16, 190`)],-1),p[3]||=o(`p`,null,[o(`strong`,null,`Sorted:`),c(` 16, 24, 43, | 50 (head) | 82, 140, 170, 190`)],-1),p[4]||=o(`p`,null,[o(`strong`,null,`SCAN sweep (outward, then inward):`)],-1),n(m,{title:``,ranges:[]},{default:r(()=>[...p[0]||=[o(`pre`,{class:`shiki shiki-themes vitesse-dark vitesse-light slidev-code`,style:{"--shiki-dark":`#dbd7caee`,"--shiki-light":`#393a34`,"--shiki-dark-bg":`#121212`,"--shiki-light-bg":`#ffffff`}},[o(`code`,{class:`language-text`},[o(`span`,{class:`line`},[o(`span`,null,` Movement:`)]),c(`
+`),o(`span`,{class:`line`},[o(`span`,null,`  50 → 82   : 32`)]),c(`
+`),o(`span`,{class:`line`},[o(`span`,null,`  82 → 140  : 58`)]),c(`
+`),o(`span`,{class:`line`},[o(`span`,null,`  140 → 170 : 30`)]),c(`
+`),o(`span`,{class:`line`},[o(`span`,null,`  170 → 190 : 20`)]),c(`
+`),o(`span`,{class:`line`},[o(`span`,null,`  190 → 43  : 147  ← reversal, head sweeps back`)]),c(`
+`),o(`span`,{class:`line`},[o(`span`,null,`  43 → 24   : 19`)]),c(`
+`),o(`span`,{class:`line`},[o(`span`,null,`  24 → 16   : 8`)]),c(`
+`),o(`span`,{class:`line`},[o(`span`)]),c(`
+`),o(`span`,{class:`line`},[o(`span`,null,` Total head movement: 32 + 58 + 30 + 20 + 147 + 19 + 8 = 314 cylinders`)]),c(`
+`),o(`span`,{class:`line`},[o(`span`)]),c(`
+`),o(`span`,{class:`line`},[o(`span`,null,` Order served: 82, 140, 170, 190, 43, 24, 16`)])])],-1)]]),_:1}),p[5]||=o(`p`,null,[o(`strong`,null,`Compare:`),c(` FCFS total = |50-82|+|82-170|+|170-43|+|43-140|+|140-24|+|24-16|+|16-190|`),o(`br`),c(` = 32+88+127+97+116+8+174 = `),o(`strong`,null,`642 cylinders`),c(` — SCAN is 2× better.`)],-1)]),_:1},16)}}};export{p as default};
