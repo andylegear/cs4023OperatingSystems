@@ -1,0 +1,1 @@
+import{c as e}from"./chunk-BBDM4ZFP-BbaNvXKZ.js";export{e as createEventModelingServices};
